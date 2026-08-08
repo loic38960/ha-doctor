@@ -1,7 +1,7 @@
 name: "HA Doctor"
-version: "0.6.2"
+version: "0.7.0"
 slug: "ha_doctor"
-description: "Diagnostic local, temporel, explicatif et en lecture seule de votre installation Home Assistant"
+description: "Contrôle technique local, corrélé, temporel et en lecture seule de votre installation Home Assistant"
 arch:
   - amd64
   - aarch64
