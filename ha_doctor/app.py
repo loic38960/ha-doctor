@@ -5,14 +5,14 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from scanner_v060 import scan
+from scanner_v070 import scan
 from share_export import build_anonymized_report
 from temporal_v060 import load_history
 
 PORT = 8099
-VERSION = "0.6.2"
+VERSION = "0.7.0"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 HISTORY_PATH = DATA_DIR / "ha-doctor-history.json"
@@ -30,6 +30,15 @@ def _iso_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _history_score(item):
+    if not isinstance(item, dict):
+        return None
+    score = item.get("health_score_v4")
+    if score is None:
+        score = item.get("health_score_v3")
+    return score
+
+
 def scan_status():
     with SCAN_STATE_LOCK:
         state = dict(SCAN_STATE)
@@ -39,6 +48,8 @@ def scan_status():
         "report_available": REPORT_PATH.exists(),
         "history_available": HISTORY_PATH.exists(),
         "history_count": len(load_history(HISTORY_PATH)),
+        "read_only": True,
+        "automatic_fix": False,
     })
     return state
 
@@ -73,7 +84,8 @@ def load_report():
     if not REPORT_PATH.exists():
         return None
     try:
-        return json.loads(REPORT_PATH.read_text(encoding="utf-8"))
+        data = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
     except Exception:
         return None
 
@@ -86,8 +98,10 @@ def compact_report(report):
     for key in (
         "product", "version", "generated_at", "scan_duration_seconds", "privacy",
         "scores", "score_meta", "diagnostic_engine", "executive_summary",
-        "diagnostic_summary", "action_plan", "diagnostic_explanations",
-        "registry_observations", "root_cause_summary", "temporal_analysis",
+        "diagnostic_summary", "action_plan", "registry_observations",
+        "root_cause_summary", "temporal_analysis", "regression_analysis",
+        "architecture_analysis", "maintenance_debt", "quality_gates",
+        "recommendation_queue", "dependency_graph_meta", "report_schema",
     ):
         if key in report:
             compact[key] = report[key]
@@ -119,7 +133,7 @@ def compact_report(report):
                 "groups": [
                     item for item in (integration.get("groups") or [])
                     if item.get("status") in {"offline", "degraded", "watch"}
-                ][:15],
+                ][:20],
             },
             "device_health": {
                 "total": devices.get("total"),
@@ -129,7 +143,7 @@ def compact_report(report):
                 "groups": [
                     item for item in (devices.get("groups") or [])
                     if item.get("status") in {"offline", "degraded", "watch"}
-                ][:15],
+                ][:20],
             },
             "orphan_analysis": {
                 "probable_orphan_count": orphan.get("probable_orphan_count", orphan.get("high_confidence_count", 0)),
@@ -143,7 +157,6 @@ def compact_report(report):
     compact["export_meta"] = {
         "type": "diagnostic_summary",
         "full_dependency_graph_included": False,
-        "full_findings_examples_included": False,
         "raw_states_included": False,
         "identifiers_removed": False,
         "intended_for_sharing": True,
@@ -161,6 +174,8 @@ def history_summary():
         "items": [
             {
                 "generated_at": x.get("generated_at"),
+                "health_score": _history_score(x),
+                "health_score_v4": x.get("health_score_v4"),
                 "health_score_v3": x.get("health_score_v3"),
                 "legacy_score": x.get("legacy_score"),
                 "priority_counts": x.get("priority_counts"),
@@ -168,6 +183,8 @@ def history_summary():
                 "unknown_count": x.get("unknown_count"),
                 "active_diagnostic_count": len(x.get("active_ids") or []),
                 "registry_incident_count": len(x.get("registry_ids") or []),
+                "architecture": x.get("architecture"),
+                "maintenance_debt_score": x.get("maintenance_debt_score"),
             }
             for x in history
         ],
@@ -177,6 +194,38 @@ def history_summary():
             "diagnostic_ids_exposed": False,
         },
     }
+
+
+def insights_report(report):
+    if not isinstance(report, dict):
+        return None
+    return {
+        "product": report.get("product"),
+        "version": report.get("version"),
+        "generated_at": report.get("generated_at"),
+        "scores": report.get("scores"),
+        "executive_summary": report.get("executive_summary"),
+        "diagnostic_summary": report.get("diagnostic_summary"),
+        "regression_analysis": report.get("regression_analysis"),
+        "root_cause_summary": report.get("root_cause_summary"),
+        "architecture_analysis": report.get("architecture_analysis"),
+        "maintenance_debt": report.get("maintenance_debt"),
+        "quality_gates": report.get("quality_gates"),
+        "recommendation_queue": report.get("recommendation_queue"),
+        "report_schema": report.get("report_schema"),
+    }
+
+
+def diagnostic_detail(report, diagnostic_id):
+    if not isinstance(report, dict) or not diagnostic_id:
+        return None
+    for item in report.get("diagnostic_explanations") or []:
+        if str(item.get("id") or "") == diagnostic_id:
+            return item
+    for item in (report.get("action_plan") or {}).get("items") or []:
+        if str(item.get("id") or "") == diagnostic_id:
+            return item
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -206,34 +255,82 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _report_or_404(self):
+        report = load_report()
+        if report is None:
+            self._json({"ready": False, "error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
+            return None
+        return report
+
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
+
         if path in {"/", ""}:
             html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
             html = html.replace("__HA_DOCTOR_VERSION__", VERSION)
             return self._bytes(html.encode("utf-8"), "text/html; charset=utf-8")
         if path.endswith("/api/status") or path == "/api/status":
             return self._json(scan_status())
+        if path.endswith("/api/version") or path == "/api/version":
+            return self._json({"product": "HA Doctor", "version": VERSION, "report_schema": "ha-doctor-report/0.7", "read_only": True})
         if path.endswith("/api/report") or path == "/api/report":
             report = load_report()
             return self._json(report if report is not None else {"ready": False}, 200 if report is not None else HTTPStatus.NOT_FOUND)
         if path.endswith("/api/history") or path == "/api/history":
             return self._json(history_summary())
         if path.endswith("/api/summary") or path == "/api/summary":
-            report = load_report()
+            report = self._report_or_404()
             if report is None:
-                return self._json({"ready": False}, HTTPStatus.NOT_FOUND)
+                return
             return self._json(compact_report(report))
-        if path.endswith("/api/download-summary") or path == "/api/download-summary":
-            report = load_report()
+        if path.endswith("/api/insights") or path == "/api/insights":
+            report = self._report_or_404()
             if report is None:
-                return self._json({"error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
+                return
+            return self._json(insights_report(report))
+        if path.endswith("/api/actions") or path == "/api/actions":
+            report = self._report_or_404()
+            if report is None:
+                return
+            return self._json(report.get("action_plan") or {})
+        if path.endswith("/api/architecture") or path == "/api/architecture":
+            report = self._report_or_404()
+            if report is None:
+                return
+            return self._json({
+                "architecture_analysis": report.get("architecture_analysis") or {},
+                "dependency_graph_meta": report.get("dependency_graph_meta") or {},
+            })
+        if path.endswith("/api/quality") or path == "/api/quality":
+            report = self._report_or_404()
+            if report is None:
+                return
+            return self._json({
+                "quality_gates": report.get("quality_gates") or {},
+                "maintenance_debt": report.get("maintenance_debt") or {},
+                "privacy": report.get("privacy") or {},
+            })
+        if path.endswith("/api/diagnostic") or path == "/api/diagnostic":
+            report = self._report_or_404()
+            if report is None:
+                return
+            diagnostic_id = str((query.get("id") or [""])[0])
+            item = diagnostic_detail(report, diagnostic_id)
+            if item is None:
+                return self._json({"error": "Diagnostic introuvable", "id": diagnostic_id}, HTTPStatus.NOT_FOUND)
+            return self._json(item)
+        if path.endswith("/api/download-summary") or path == "/api/download-summary":
+            report = self._report_or_404()
+            if report is None:
+                return
             data = json.dumps(compact_report(report), ensure_ascii=False, indent=2).encode("utf-8")
             return self._bytes(data, "application/json; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="ha-doctor-summary.json"'})
         if path.endswith("/api/download-anonymized") or path == "/api/download-anonymized":
-            report = load_report()
+            report = self._report_or_404()
             if report is None:
-                return self._json({"error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
+                return
             data = json.dumps(build_anonymized_report(report), ensure_ascii=False, indent=2).encode("utf-8")
             return self._bytes(data, "application/json; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="ha-doctor-anonymized.json"'})
         if path.endswith("/api/download") or path == "/api/download":
@@ -241,7 +338,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
             return self._bytes(REPORT_PATH.read_bytes(), "application/json; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="ha-doctor-report.json"'})
         if path.endswith("/health") or path == "/health":
-            return self._json({"status": "ok", "version": VERSION})
+            return self._json({"status": "ok", "version": VERSION, "read_only": True, "report_available": REPORT_PATH.exists()})
         return self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self):
