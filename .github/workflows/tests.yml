@@ -19,7 +19,26 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Compile Python sources
         run: python -m py_compile ha_doctor/*.py
+      - name: Validate 0.7 UI markers
+        run: |
+          grep -q "Vue d'ensemble" ha_doctor/static/index.html
+          grep -q "Architecture" ha_doctor/static/index.html
+          grep -q "Qualité & confidentialité" ha_doctor/static/index.html
+          grep -q "Score V4" ha_doctor/static/index.html
+      - name: Validate version consistency
+        run: |
+          grep -q 'version: "0.7.0"' ha_doctor/config.yaml
+          grep -q 'VERSION = "0.7.0"' ha_doctor/app.py
+          grep -q 'VERSION = "0.7.0"' ha_doctor/scanner_v070.py
+          grep -q 'Starting HA Doctor 0.7.0' ha_doctor/run.sh
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.6.2 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.7.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+      - name: Verify packaged modules exist
+        run: |
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/scanner_v070.py && test -f /app/intelligence_v070.py && test -f /app/temporal_v060.py && test -f /app/share_export.py'
       - name: Smoke test packaged Python imports
-        run: docker run --rm --entrypoint python3 ha-doctor-ci -c "import app, scanner_v060, temporal_v060, share_export; assert app.VERSION == '0.6.2'; print('HA Doctor packaged imports OK', app.VERSION)"
+        run: |
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import app, scanner_v070, intelligence_v070, share_export; assert app.VERSION == '0.7.0'; assert scanner_v070.VERSION == '0.7.0'; print('HA Doctor packaged imports OK', app.VERSION)"
+      - name: Smoke test packaged web assets
+        run: |
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "from pathlib import Path; p=Path('/app/static/index.html'); assert p.exists(); t=p.read_text(); assert 'Architecture' in t and 'Qualité & confidentialité' in t; print('HA Doctor UI packaged OK')"
