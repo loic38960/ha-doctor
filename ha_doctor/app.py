@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -9,24 +10,61 @@ from urllib.parse import urlparse
 from scanner import scan
 
 PORT = 8099
+VERSION = "0.2.2"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 STATIC_DIR = Path("/app/static")
 SCAN_LOCK = threading.Lock()
+SCAN_STATE_LOCK = threading.Lock()
+SCAN_STATE = {
+    "started_at": None,
+    "last_completed_at": None,
+    "last_error": None,
+}
 
 
 def _include_yaml():
     return os.getenv("HA_DOCTOR_YAML_ANALYSIS", "true").lower() in {"1", "true", "yes", "on"}
 
 
+def _iso_now():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def scan_status():
+    with SCAN_STATE_LOCK:
+        state = dict(SCAN_STATE)
+    state.update({
+        "scanning": SCAN_LOCK.locked(),
+        "version": VERSION,
+        "report_available": REPORT_PATH.exists(),
+    })
+    return state
+
+
 def run_scan():
     with SCAN_LOCK:
-        report = scan(include_yaml=_include_yaml())
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = REPORT_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(REPORT_PATH)
-        return report
+        with SCAN_STATE_LOCK:
+            SCAN_STATE["started_at"] = _iso_now()
+            SCAN_STATE["last_error"] = None
+        print("[HA Doctor] analysis started", flush=True)
+        try:
+            report = scan(include_yaml=_include_yaml())
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            tmp = REPORT_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp.replace(REPORT_PATH)
+            with SCAN_STATE_LOCK:
+                SCAN_STATE["last_completed_at"] = _iso_now()
+            print("[HA Doctor] analysis complete", flush=True)
+            return report
+        except Exception as exc:
+            with SCAN_STATE_LOCK:
+                SCAN_STATE["last_error"] = type(exc).__name__
+            raise
+        finally:
+            with SCAN_STATE_LOCK:
+                SCAN_STATE["started_at"] = None
 
 
 def load_report():
@@ -39,7 +77,7 @@ def load_report():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HADoctor/0.2.1"
+    server_version = f"HADoctor/{VERSION}"
 
     def log_message(self, fmt, *args):
         print(f"[HA Doctor] {self.address_string()} - {fmt % args}", flush=True)
@@ -70,6 +108,8 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/", ""}:
             html = (STATIC_DIR / "index.html").read_bytes()
             return self._bytes(html, "text/html; charset=utf-8")
+        if path.endswith("/api/status") or path == "/api/status":
+            return self._json(scan_status())
         if path.endswith("/api/report") or path == "/api/report":
             report = load_report()
             if report is None:
@@ -85,14 +125,17 @@ class Handler(BaseHTTPRequestHandler):
                 headers={"Content-Disposition": 'attachment; filename="ha-doctor-report.json"'},
             )
         if path.endswith("/health") or path == "/health":
-            return self._json({"status": "ok", "version": "0.2.1"})
+            return self._json({"status": "ok", "version": VERSION})
         return self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self):
         path = urlparse(self.path).path
         if path.endswith("/api/scan") or path == "/api/scan":
             if SCAN_LOCK.locked():
-                return self._json({"error": "Une analyse est déjà en cours"}, HTTPStatus.CONFLICT)
+                return self._json({
+                    "error": "Une analyse est déjà en cours",
+                    **scan_status(),
+                }, HTTPStatus.CONFLICT)
             try:
                 report = run_scan()
                 return self._json(report)
@@ -103,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("[HA Doctor] process started (0.2.1)", flush=True)
+    print(f"[HA Doctor] process started ({VERSION})", flush=True)
     if os.getenv("HA_DOCTOR_SCAN_ON_START", "true").lower() in {"1", "true", "yes", "on"}:
         def initial_scan():
             try:
