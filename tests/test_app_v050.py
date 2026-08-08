@@ -13,7 +13,7 @@ class CompactExportTests(unittest.TestCase):
     def test_compact_export_excludes_dependency_graph_and_raw_findings(self):
         report = {
             "product": "HA Doctor",
-            "version": "0.5.0",
+            "version": "0.7.0",
             "generated_at": "2026-08-08T20:00:00Z",
             "scores": {"global": 86},
             "privacy": {"raw_states_persisted": False},
@@ -27,7 +27,11 @@ class CompactExportTests(unittest.TestCase):
             },
             "executive_summary": {"text": "Synthèse"},
             "action_plan": {"items": [{"title": "Action"}]},
-            "diagnostic_explanations": [{"title": "Diagnostic"}],
+            "architecture_analysis": {"complexity_score": 63},
+            "maintenance_debt": {"score": 22},
+            "quality_gates": {"overall": "pass"},
+            "regression_analysis": {"state": "stable"},
+            "report_schema": {"version": "ha-doctor-report/0.7"},
             "registry_analysis": {
                 "available": True,
                 "entity_registry_count": 1700,
@@ -58,14 +62,19 @@ class CompactExportTests(unittest.TestCase):
             },
             "dependency_graph": [{"very": "large"}],
             "findings": [{"examples": [{"huge": "blob"}]}],
+            "diagnostic_explanations": [{"title": "Very detailed diagnostic"}],
         }
 
         compact = app.compact_report(report)
         self.assertEqual(compact["scores"]["global"], 86)
         self.assertIn("action_plan", compact)
-        self.assertIn("diagnostic_explanations", compact)
+        self.assertIn("architecture_analysis", compact)
+        self.assertIn("maintenance_debt", compact)
+        self.assertIn("quality_gates", compact)
+        self.assertIn("report_schema", compact)
         self.assertNotIn("dependency_graph", compact)
         self.assertNotIn("findings", compact)
+        self.assertNotIn("diagnostic_explanations", compact)
         self.assertTrue(compact["export_meta"]["intended_for_sharing"])
         groups = compact["registry_summary"]["integration_health"]["groups"]
         self.assertEqual(len(groups), 1)
@@ -73,6 +82,11 @@ class CompactExportTests(unittest.TestCase):
 
     def test_compact_export_is_none_for_invalid_input(self):
         self.assertIsNone(app.compact_report(None))
+
+    def test_version_endpoint_contract_constants(self):
+        self.assertEqual(app.VERSION, "0.7.0")
+        self.assertTrue(app.scan_status()["read_only"])
+        self.assertFalse(app.scan_status()["automatic_fix"])
 
 
 if __name__ == "__main__":
