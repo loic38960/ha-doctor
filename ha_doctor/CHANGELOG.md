@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.0
+
+- Ajout du moteur explicatif local `explain_v1`, sans IA externe et sans envoi de données hors de Home Assistant.
+- Chaque finding important reçoit désormais : diagnostic probable, niveau de confiance, impact, causes plausibles, preuves compactes, contrôles ordonnés, objectif de résolution et conditions permettant de relativiser l'alerte.
+- Nouveau bloc `executive_summary` pour fournir un verdict lisible sans parcourir le JSON.
+- Nouveau bloc `action_plan` qui fusionne les règles statiques et les causes racines du registre dans un ordre de traitement unique.
+- Nouveau bloc `diagnostic_explanations` destiné à l'interface et à de futurs rapports avancés.
+- Nouveau bloc `registry_observations` pour conserver les états potentiellement transitoires sans les transformer en panne.
+- Corrélation des anomalies par intégration : une intégration entièrement indisponible devient une cause racine au lieu d'une série d'entités indépendantes.
+- Corrélation par appareil : un appareil entièrement indisponible peut être diagnostiqué comme incident local lorsque son intégration reste globalement fonctionnelle.
+- Détection de groupes de plusieurs appareils hors ligne appartenant à une même intégration lorsque cela apporte une cause commune plausible.
+- Calibration spécifique des intégrations transitoires héritée de 0.4.1 : Tesla Fleet et Mobile App restent tolérées lorsque les valeurs peuvent dépendre de la veille ou de la remontée du terminal.
+- Refonte complète de l'interface : Verdict HA Doctor → Plan d'action → Causes racines → Observations tolérées → Santé des entités → Findings techniques.
+- Affichage du niveau de confiance directement dans les cartes de diagnostic.
+- Le moteur explicatif n'applique aucune correction et n'utilise jamais une valeur brute de secret comme preuve.
+- Le score reste volontairement inchangé : `explanatory_scoring: false` pendant la validation Alpha.
+- Ajout de tests de non-régression sur SmartThings, Tesla, MQTT, secrets et ordre du plan d'action.
+
+## 0.4.1
+
+- Calibration des groupes Tesla Fleet : un grand nombre de valeurs `unknown` sans état manquant ne suffit plus à déclarer le véhicule hors ligne.
+- Calibration de Mobile App afin de limiter les faux diagnostics lorsque des capteurs du terminal ne remontent pas temporairement de données.
+- Les entités dérivées de l'intégration `energy` sont classées secondaires et ne simulent plus une panne d'intégration.
+- Séparation stricte entre `probable_orphan_count` et `review_candidate_count`.
+- `HD-REG-001` est réservé aux entrées de registre actives sans aucun état correspondant.
+- Nouvelle règle `HD-REG-002` pour les entités locales simplement `unavailable` sans preuve d'orphelin.
+- Ajout des compteurs `problematic` pour distinguer les groupes réellement hors ligne/dégradés des simples groupes à surveiller.
+
 ## 0.4.0
 
 - Analyse read-only des registres Home Assistant via le proxy WebSocket officiel du Supervisor, sans lecture de `.storage`.
