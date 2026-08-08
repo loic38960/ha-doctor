@@ -25,6 +25,20 @@ jobs:
           grep -q "Architecture" ha_doctor/static/index.html
           grep -q "Qualité & confidentialité" ha_doctor/static/index.html
           grep -q "Score V4" ha_doctor/static/index.html
+      - name: Validate 0.8 runtime UI enhancement
+        run: |
+          PYTHONPATH=ha_doctor python - <<'PY'
+          from pathlib import Path
+          import app_v080
+          source = Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
+          enhanced = app_v080.enhance_ui_v080(source)
+          assert '__HA_DOCTOR_VERSION__' not in enhanced
+          assert 'Entity Flow V3' in enhanced
+          assert 'HA Doctor 0.8 corrèle' in enhanced
+          Path('/tmp/ha-doctor-v080-ui.js').write_text(app_v080.UI_PATCH_JS, encoding='utf-8')
+          print('HA Doctor 0.8 runtime UI injection OK')
+          PY
+          node --check /tmp/ha-doctor-v080-ui.js
       - name: Validate version consistency
         run: |
           grep -q 'version: "0.8.0"' ha_doctor/config.yaml
@@ -37,10 +51,10 @@ jobs:
         run: docker build --build-arg BUILD_VERSION=0.8.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
       - name: Verify packaged modules exist
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/scanner_v080.py && test -f /app/intelligence_v080.py && test -f /app/flow_v080.py && test -f /app/app_v080.py && test -f /app/intelligence_v070.py && test -f /app/temporal_v060.py && test -f /app/share_export.py'
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/scanner_v080.py && test -f /app/intelligence_v080.py && test -f /app/flow_v080.py && test -f /app/flow_v080_fixed.py && test -f /app/app_v080.py && test -f /app/intelligence_v070.py && test -f /app/temporal_v060.py && test -f /app/share_export.py'
       - name: Smoke test packaged Python imports
         run: |
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "import app_v080, scanner_v080, intelligence_v080, flow_v080, share_export; assert app_v080.VERSION == '0.8.0'; assert scanner_v080.VERSION == '0.8.0'; print('HA Doctor 0.8 packaged imports OK', app_v080.VERSION)"
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import app_v080, scanner_v080, intelligence_v080, flow_v080, flow_v080_fixed, share_export; assert app_v080.VERSION == '0.8.0'; assert scanner_v080.VERSION == '0.8.0'; print('HA Doctor 0.8 packaged imports OK', app_v080.VERSION)"
       - name: Smoke test packaged web assets
         run: |
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "from pathlib import Path; p=Path('/app/static/index.html'); assert p.exists(); t=p.read_text(); assert 'Architecture' in t and 'Qualité & confidentialité' in t; print('HA Doctor UI packaged OK')"
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "from pathlib import Path; import app_v080; p=Path('/app/static/index.html'); assert p.exists(); t=app_v080.enhance_ui_v080(p.read_text()); assert 'Architecture' in t and 'Qualité & confidentialité' in t and 'Entity Flow V3' in t; print('HA Doctor 0.8 UI packaged OK')"
