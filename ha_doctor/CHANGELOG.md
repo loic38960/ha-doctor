@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2
+
+- Correction du triage des entités `notify.*` en état `unknown` : elles sont désormais exclues comme entités stateless avant le regroupement.
+- Correction spécifique des `notify` mobiles dont le nom contient `iphone` ou `ipad` et qui étaient auparavant classés à tort dans `Mobiles / Companion App`.
+- Modèle de score/triage identifié comme `priority_v1.2` sans changement des pénalités ni des priorités de diagnostic.
+- Ajout de tests de non-régression sur ce cas réel.
+
+## 0.3.1
+
+- Raffinement du triage des entités indisponibles/inconnues.
+- Séparation des groupes probablement transitoires, optionnels/secondaires et réellement à examiner.
+- Libellés moins alarmistes pour les entités `unavailable`.
+- Version de l'App injectée automatiquement dans l'interface pour éviter les numéros affichés en dur.
+
 ## 0.3.0
 
 - Nouveau diagnostic orienté utilisateur : `À corriger maintenant`, `À vérifier`, `Optimisations`, `Informations`.
