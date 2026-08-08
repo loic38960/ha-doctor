@@ -2,15 +2,20 @@
 
 HA Doctor est un prototype commercial d'audit **local et en lecture seule** pour Home Assistant OS.
 
-## Alpha 0.3
+## Alpha 0.4
 
 - Interface via Home Assistant Ingress
 - Inventaire Home Assistant via API REST
 - Scan local des YAML sans lire `secrets.yaml`
 - Diagnostic priorisé : **À corriger maintenant / À vérifier / Optimisations / Informations**
 - Regroupement intelligent des entités `unavailable` et `unknown`
+- Analyse read-only des registres Home Assistant via le proxy WebSocket officiel du Supervisor
+- Regroupement des problèmes par **intégration** et par **appareil**
+- Distinction entre entités principales et fonctions secondaires/configuration/diagnostic
+- Détection preview d'entités **probablement orphelines** avec niveau de confiance
+- Aucun accès direct à `.storage`
 - Score de santé Alpha recalibré selon la priorité des anomalies
-- Conservation de l'ancien modèle de score pour comparaison pendant l'Alpha
+- Les nouveaux insights de registre 0.4 ne modifient pas encore le score afin d'être validés sur des installations réelles
 - Analyse des packages, `!include`, blueprints et entrées `!input`
 - Détection des références d'entités absentes avec filtrage des services/actions Home Assistant
 - Détection des automatisations contrôlant la même entité
@@ -27,7 +32,7 @@ HA Doctor est un prototype commercial d'audit **local et en lecture seule** pour
 - Graphe automation → triggers → entités commandées
 - Scores Système / Entités / Automatisations / Configuration / Sécurité / Performances
 - Rapport JSON téléchargeable et partageable
-- **Aucune correction automatique en Alpha 0.3**
+- **Aucune correction automatique en Alpha 0.4**
 
 ## Installation via dépôt personnalisé
 
@@ -44,8 +49,10 @@ Dans Home Assistant :
 
 HA Doctor monte la configuration Home Assistant en lecture seule. `secrets.yaml`, `.storage`, les bases de données, certificats, clés et sauvegardes binaires sont exclus du scanner.
 
+La couche registre 0.4 utilise uniquement le WebSocket Home Assistant via le Supervisor. Le payload brut des registres et le token Supervisor ne sont jamais enregistrés dans le rapport.
+
 Le rapport ne conserve pas les valeurs brutes des états Home Assistant, ne conserve jamais la valeur d'un secret détecté et retire les identifiants locaux inutiles tels que `location_name` et `hostname`.
 
 ## Développement
 
-Les tests unitaires et la compilation Python sont exécutés automatiquement par GitHub Actions sur `main` et sur les pull requests.
+Les tests unitaires, la compilation Python et la construction réelle de l'image Home Assistant App sont exécutés automatiquement par GitHub Actions sur `main` et sur les pull requests.
