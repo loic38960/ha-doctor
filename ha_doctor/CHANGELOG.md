@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.3.0
+
+- Nouveau diagnostic orienté utilisateur : `À corriger maintenant`, `À vérifier`, `Optimisations`, `Informations`.
+- Nouveau modèle de score `priority_v1`, moins sensible au volume brut d'alertes génériques.
+- Conservation de l'ancien score dans `score_meta.legacy_global` pour suivre l'évolution du modèle Alpha.
+- Regroupement des entités `unavailable` et `unknown` par familles : mobiles, paramètres d'appareils, présence, capteurs, actionneurs, etc.
+- Distinction entre entités probablement temporaires/optionnelles et entités à examiner.
+- Filtrage des références uniquement présentes dans `recorder.exclude.entities`.
+- Utilisation de la liste réelle des services Home Assistant pour éviter de confondre actions et `entity_id`.
+- Nouveau résumé `diagnostic_summary` directement exploitable par l'interface ou un futur rapport PDF.
+- Nouvelle interface centrée sur le plan d'action plutôt que sur les règles techniques.
+- Les identifiants `location_name` et `hostname` restent retirés du rapport partageable.
+
+## 0.2.4
+
+- Validation des références à partir du registre réel des services Home Assistant.
+- Filtrage supplémentaire des références techniques et blueprints.
+- Détection `HD-CFG-006` des capteurs Integral alimentés par une source non numérique.
+- Retrait de `location_name` et `hostname` du JSON exporté.
+
+## 0.2.3
+
+- Réduction importante des faux positifs de références YAML.
+- Séparation des secrets actifs et des secrets présents dans des archives/sauvegardes.
+- Nouvelle règle `HD-AUTO-009` pour les automatisations qui écrivent simultanément les mêmes compteurs numériques.
+- Meilleure gestion des conflits impliquant scripts, scènes et helpers.
+- Filtrage d'une partie des entités stateless en état `unknown`.
+
+## 0.2.2
+
+- Ajout d'un statut d'analyse en cours dans l'interface.
+- Bouton de scan désactivé pendant une analyse et rafraîchissement automatique à la fin.
+
 ## 0.2.1
 
 - Correction du démarrage avec l'image de base Home Assistant/S6 : ajout de `init: false` requis par S6 Overlay v3.
