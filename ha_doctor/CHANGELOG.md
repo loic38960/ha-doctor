@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Correction du démarrage avec l'image de base Home Assistant/S6 : ajout de `init: false` requis par S6 Overlay v3.
+- Logs de démarrage explicites et sortie Python non bufferisée pour faciliter le diagnostic.
+- Mise à jour de l'URL du dépôt après renommage en `loic38960/ha-doctor`.
+
 ## 0.2.0
 
 - Résolution des automations basées sur des blueprints et des références `!input`.

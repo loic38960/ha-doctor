@@ -1,5 +1,5 @@
 name: "HA Doctor"
-version: "0.2.0"
+version: "0.2.1"
 slug: "ha_doctor"
 description: "Audit local et en lecture seule de votre installation Home Assistant"
 arch:
@@ -7,6 +7,7 @@ arch:
   - aarch64
 startup: application
 boot: auto
+init: false
 homeassistant: "2026.2.0"
 ingress: true
 ingress_port: 8099

@@ -39,10 +39,10 @@ def load_report():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HADoctor/0.2"
+    server_version = "HADoctor/0.2.1"
 
     def log_message(self, fmt, *args):
-        print(f"[HA Doctor] {self.address_string()} - {fmt % args}")
+        print(f"[HA Doctor] {self.address_string()} - {fmt % args}", flush=True)
 
     def _json(self, payload, status=200, headers=None):
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -85,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers={"Content-Disposition": 'attachment; filename="ha-doctor-report.json"'},
             )
         if path.endswith("/health") or path == "/health":
-            return self._json({"status": "ok", "version": "0.2.0"})
+            return self._json({"status": "ok", "version": "0.2.1"})
         return self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self):
@@ -97,20 +97,21 @@ class Handler(BaseHTTPRequestHandler):
                 report = run_scan()
                 return self._json(report)
             except Exception as exc:
-                print(f"[HA Doctor] scan failed: {type(exc).__name__}: {exc}")
+                print(f"[HA Doctor] scan failed: {type(exc).__name__}: {exc}", flush=True)
                 return self._json({"error": "Le scan a échoué", "type": type(exc).__name__}, HTTPStatus.INTERNAL_SERVER_ERROR)
         return self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
 
 if __name__ == "__main__":
+    print("[HA Doctor] process started (0.2.1)", flush=True)
     if os.getenv("HA_DOCTOR_SCAN_ON_START", "true").lower() in {"1", "true", "yes", "on"}:
         def initial_scan():
             try:
                 run_scan()
-                print("[HA Doctor] initial scan complete")
+                print("[HA Doctor] initial scan complete", flush=True)
             except Exception as exc:
-                print(f"[HA Doctor] initial scan failed: {type(exc).__name__}: {exc}")
+                print(f"[HA Doctor] initial scan failed: {type(exc).__name__}: {exc}", flush=True)
         threading.Thread(target=initial_scan, daemon=True).start()
 
-    print(f"[HA Doctor] web server listening on {PORT}")
+    print(f"[HA Doctor] web server listening on {PORT}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

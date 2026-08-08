@@ -1,7 +1,11 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
+bashio::log.info "Starting HA Doctor 0.2.1"
+bashio::log.info "Read-only Home Assistant configuration mount: /ha_config"
+
 export HA_DOCTOR_SCAN_ON_START="$(bashio::config 'scan_on_start')"
 export HA_DOCTOR_YAML_ANALYSIS="$(bashio::config 'include_yaml_analysis')"
 
-exec python3 /app/app.py
+bashio::log.info "scan_on_start=${HA_DOCTOR_SCAN_ON_START}, include_yaml_analysis=${HA_DOCTOR_YAML_ANALYSIS}"
+exec python3 -u /app/app.py
