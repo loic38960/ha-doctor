@@ -65,6 +65,8 @@ def calibrate(report):
     )
     engine = dict(report.get("diagnostic_engine") or {})
     engine["explanation_count"] = len(kept)
+    engine["finding_explanation_count"] = sum(1 for x in kept if x.get("source_type") == "finding")
+    engine["registry_incident_count"] = sum(1 for x in kept if str(x.get("source_type") or "").startswith("registry_"))
     engine["confidence_counts"] = dict(Counter(x.get("confidence") for x in kept))
     engine["root_cause_calibration"] = "root_cause_v1"
     engine["suppressed_noise_count"] = suppressed
