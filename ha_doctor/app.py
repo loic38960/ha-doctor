@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from scanner_v050 import scan
+from scanner_v050_calibration import scan
 
 PORT = 8099
 VERSION = "0.5.0"
