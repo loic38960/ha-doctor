@@ -77,6 +77,88 @@ def load_report():
         return None
 
 
+def compact_report(report):
+    """Build a smaller shareable diagnostic view without raw dependency graph data."""
+    if not isinstance(report, dict):
+        return None
+
+    compact = {}
+    for key in (
+        "product",
+        "version",
+        "generated_at",
+        "scan_duration_seconds",
+        "privacy",
+        "scores",
+        "score_meta",
+        "diagnostic_engine",
+        "executive_summary",
+        "diagnostic_summary",
+        "action_plan",
+        "diagnostic_explanations",
+        "registry_observations",
+    ):
+        if key in report:
+            compact[key] = report[key]
+
+    inventory = report.get("inventory") or {}
+    compact["inventory_summary"] = {
+        "states": inventory.get("states"),
+        "automations_detected": inventory.get("automations_detected"),
+        "blueprints_detected": inventory.get("blueprints_detected"),
+        "yaml_files_scanned": inventory.get("yaml_files_scanned"),
+        "unavailable_count": inventory.get("unavailable_count"),
+        "unknown_count": inventory.get("unknown_count"),
+    }
+
+    registry = report.get("registry_analysis") or {}
+    if registry:
+        integration = registry.get("integration_health") or {}
+        devices = registry.get("device_health") or {}
+        orphan = registry.get("orphan_analysis") or {}
+        compact["registry_summary"] = {
+            "available": registry.get("available"),
+            "entity_registry_count": registry.get("entity_registry_count"),
+            "device_registry_count": registry.get("device_registry_count"),
+            "integration_health": {
+                "total": integration.get("total"),
+                "affected": integration.get("affected"),
+                "problematic": integration.get("problematic"),
+                "offline": integration.get("offline"),
+                "groups": [
+                    item for item in (integration.get("groups") or [])
+                    if item.get("status") in {"offline", "degraded", "watch"}
+                ][:15],
+            },
+            "device_health": {
+                "total": devices.get("total"),
+                "affected": devices.get("affected"),
+                "problematic": devices.get("problematic"),
+                "offline": devices.get("offline"),
+                "groups": [
+                    item for item in (devices.get("groups") or [])
+                    if item.get("status") in {"offline", "degraded", "watch"}
+                ][:15],
+            },
+            "orphan_analysis": {
+                "probable_orphan_count": orphan.get("probable_orphan_count", orphan.get("high_confidence_count", 0)),
+                "review_candidate_count": orphan.get("review_candidate_count", 0),
+                "probable_orphans": (orphan.get("probable_orphans") or [])[:20],
+                "local_unavailable_candidates": (orphan.get("local_unavailable_candidates") or [])[:20],
+            },
+            "errors": registry.get("errors") or [],
+        }
+
+    compact["export_meta"] = {
+        "type": "diagnostic_summary",
+        "full_dependency_graph_included": False,
+        "full_findings_examples_included": False,
+        "raw_states_included": False,
+        "intended_for_sharing": True,
+    }
+    return compact
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = f"HADoctor/{VERSION}"
 
@@ -117,6 +199,21 @@ class Handler(BaseHTTPRequestHandler):
             if report is None:
                 return self._json({"ready": False}, HTTPStatus.NOT_FOUND)
             return self._json(report)
+        if path.endswith("/api/summary") or path == "/api/summary":
+            report = load_report()
+            if report is None:
+                return self._json({"ready": False}, HTTPStatus.NOT_FOUND)
+            return self._json(compact_report(report))
+        if path.endswith("/api/download-summary") or path == "/api/download-summary":
+            report = load_report()
+            if report is None:
+                return self._json({"error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
+            data = json.dumps(compact_report(report), ensure_ascii=False, indent=2).encode("utf-8")
+            return self._bytes(
+                data,
+                "application/json; charset=utf-8",
+                headers={"Content-Disposition": 'attachment; filename="ha-doctor-summary.json"'},
+            )
         if path.endswith("/api/download") or path == "/api/download":
             if not REPORT_PATH.exists():
                 return self._json({"error": "Aucun rapport disponible"}, HTTPStatus.NOT_FOUND)
