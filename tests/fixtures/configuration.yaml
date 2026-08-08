@@ -1,0 +1,9 @@
+homeassistant:
+  name: Test
+mqtt:
+  password: super-secret-value
+sensor:
+  - platform: template
+    sensors:
+      exemple:
+        value_template: "{{ states('sensor.inexistant') }}"

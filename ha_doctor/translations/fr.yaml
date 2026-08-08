@@ -1,0 +1,7 @@
+configuration:
+  scan_on_start:
+    name: Analyse au démarrage
+    description: Lance automatiquement une analyse au démarrage de HA Doctor.
+  include_yaml_analysis:
+    name: Analyse YAML
+    description: Analyse les fichiers YAML autorisés de la configuration Home Assistant.

@@ -1,0 +1,29 @@
+name: "HA Doctor"
+version: "0.1.0"
+slug: "ha_doctor"
+description: "Audit local et en lecture seule de votre installation Home Assistant"
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+homeassistant: "2026.2.0"
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:stethoscope
+panel_title: "HA Doctor"
+panel_admin: true
+homeassistant_api: true
+hassio_api: true
+hassio_role: default
+map:
+  - type: homeassistant_config
+    read_only: true
+    path: /ha_config
+options:
+  scan_on_start: true
+  include_yaml_analysis: true
+schema:
+  scan_on_start: bool
+  include_yaml_analysis: bool
+stage: experimental

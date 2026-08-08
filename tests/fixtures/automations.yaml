@@ -1,0 +1,22 @@
+- id: '1'
+  alias: Pompe piscine matin
+  trigger:
+    - platform: time
+      at: '09:00:00'
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.pompe_piscine
+    - delay: '00:10:00'
+  mode: single
+- id: '2'
+  alias: Pompe piscine solaire
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.surplus_pv
+      above: 1000
+  action:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.pompe_piscine
+  mode: restart
