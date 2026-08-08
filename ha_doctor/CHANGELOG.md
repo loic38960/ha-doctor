@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.6.0
+
+- Nouveau score `root_cause_temporal_v1` calculé après corrélation des causes racines.
+- Les volumes bruts `unavailable` / `unknown` ne sont plus pénalisés une seconde fois lorsqu'une cause racine explique déjà ces entités.
+- Le score V3 tient compte de la priorité, de la sévérité, de la confiance, de la persistance temporelle et de l'impact sur les automatisations.
+- Ajout d'un historique local des 20 derniers scans dans `/data/ha-doctor-history.json`.
+- L'historique conserve uniquement dates, scores, compteurs et identifiants de diagnostics ; aucun état brut ni secret n'est persisté.
+- Les incidents de registre ponctuels sont moins pénalisés au premier scan puis renforcés lorsqu'ils persistent.
+- Détection des diagnostics nouveaux, persistants et résolus depuis le scan précédent.
+- Ajout de l'analyse des dépendances : HA Doctor relie les entités d'un diagnostic aux automatisations qui les utilisent.
+- Chaque action expose désormais un niveau d'impact de dépendance et le nombre d'automatisations concernées.
+- Correction de l'incohérence du résumé exécutif 0.5 : les nombres d'intégrations/appareils affichés proviennent désormais des incidents réellement retenus après calibration.
+- Le plan d'action n'est plus tronqué silencieusement : `total`, `displayed` et `remaining` sont explicites et toutes les actions retenues sont exposées.
+- `HD-ENT-001` et `HD-ENT-003` restent visibles dans les findings techniques mais sont retirées du plan lorsque des causes racines de registre expliquent déjà le volume.
+- `HD-REG-002` de faible confiance est retirée du plan lorsqu'aucun orphelin probable n'est détecté.
+- Nouveau bloc `root_cause_summary` avec le nombre d'incidents d'intégration, d'appareil et de cluster réellement retenus.
+- Nouveau bloc `temporal_analysis` avec évolution du score, persistance et résolutions.
+- Nouveau moteur `explain_v2_temporal` et calibration `root_cause_v2`.
+- Nouveau endpoint `/api/history` fournissant uniquement un historique agrégé.
+- Nouveau export `ha-doctor-anonymized.json` qui retire entity_id, noms d'appareils, intégrations, automatisations et chemins de fichiers.
+- Le résumé compact est désormais explicitement marqué comme non anonymisé.
+- Refonte de l'interface : score V3, évolution dans le temps, plan corrélé, dépendances et export anonymisé.
+- Ajout de tests de non-régression sur la persistance, la déduplication du bruit, l'impact des dépendances et l'anonymisation.
+
 ## 0.5.0
 
 - Ajout du moteur explicatif local `explain_v1`, sans IA externe et sans envoi de données hors de Home Assistant.
