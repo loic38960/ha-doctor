@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from scanner import scan
 
 PORT = 8099
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 STATIC_DIR = Path("/app/static")
@@ -50,6 +50,8 @@ def run_scan():
         print("[HA Doctor] analysis started", flush=True)
         try:
             report = scan(include_yaml=_include_yaml())
+            # Runtime/package version is the commercial product version exposed to users.
+            report["version"] = VERSION
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             tmp = REPORT_PATH.with_suffix(".tmp")
             tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
