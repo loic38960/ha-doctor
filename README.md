@@ -2,44 +2,50 @@
 
 HA Doctor est un prototype commercial d'audit **local et en lecture seule** pour Home Assistant OS.
 
-## Alpha 0.2
+## Alpha 0.3
 
 - Interface via Home Assistant Ingress
 - Inventaire Home Assistant via API REST
 - Scan local des YAML sans lire `secrets.yaml`
-- Détection d'entités `unavailable` / `unknown`
-- Analyse des packages et des `!include`
-- Résolution des automations utilisant des blueprints locaux
-- Résolution des entrées `!input` des blueprints
-- Détection des références d'entités absentes
+- Diagnostic priorisé : **À corriger maintenant / À vérifier / Optimisations / Informations**
+- Regroupement intelligent des entités `unavailable` et `unknown`
+- Score de santé Alpha recalibré selon la priorité des anomalies
+- Conservation de l'ancien modèle de score pour comparaison pendant l'Alpha
+- Analyse des packages, `!include`, blueprints et entrées `!input`
+- Détection des références d'entités absentes avec filtrage des services/actions Home Assistant
 - Détection des automatisations contrôlant la même entité
-- Réduction des faux positifs lorsque les contrôleurs sont mutuellement exclusifs par une condition d'état
+- Réduction des faux positifs lorsque les contrôleurs sont mutuellement exclus par une condition d'état
 - Détection d'actions consécutives identiques
 - Détection d'IDs et alias d'automatisations dupliqués
 - Détection de boucles potentielles trigger → entité commandée
 - Détection de `time_pattern` excessivement fréquents
 - Détection de longues attentes en `mode: single`
+- Détection de plusieurs automations écrivant dans les mêmes compteurs numériques
+- Détection d'un capteur Integral alimenté par une source non numérique
 - Contrôles Recorder et sécurité HTTP de base
 - Détection heuristique de secrets potentiellement écrits en clair
 - Graphe automation → triggers → entités commandées
 - Scores Système / Entités / Automatisations / Configuration / Sécurité / Performances
-- Rapport JSON téléchargeable
-- **Aucune correction automatique en Alpha 0.2**
+- Rapport JSON téléchargeable et partageable
+- **Aucune correction automatique en Alpha 0.3**
 
-## Installation de développement
+## Installation via dépôt personnalisé
 
-Le dépôt est privé pendant l'alpha. Pour le tester, utilisez le mode **App locale** recommandé par Home Assistant :
+Dans Home Assistant :
 
-1. Copier le dossier `ha_doctor` dans `/addons/ha_doctor` sur Home Assistant OS.
-2. Aller dans **Paramètres → Apps → App Store** et recharger la liste.
-3. Installer l'App locale **HA Doctor**.
-4. Démarrer l'App.
-5. Cliquer sur **Ouvrir l'interface Web**.
-
-Le dépôt de distribution public et les images précompilées seront créés avant la bêta publique.
+1. Ouvrir **Paramètres → Apps → App Store**.
+2. Ouvrir le menu **⋮ → Dépôts**.
+3. Ajouter `https://github.com/loic38960/ha-doctor`.
+4. Rechercher les mises à jour de l'App Store.
+5. Installer ou mettre à jour **HA Doctor**.
+6. Démarrer l'App et ouvrir son interface Web.
 
 ## Sécurité
 
-HA Doctor monte la configuration Home Assistant en lecture seule. `secrets.yaml`, `.storage`, les bases de données, certificats, clés, sauvegardes et archives sont exclus du scanner.
+HA Doctor monte la configuration Home Assistant en lecture seule. `secrets.yaml`, `.storage`, les bases de données, certificats, clés et sauvegardes binaires sont exclus du scanner.
 
-Le rapport ne conserve pas les valeurs brutes des états Home Assistant et ne conserve jamais la valeur d'un secret détecté.
+Le rapport ne conserve pas les valeurs brutes des états Home Assistant, ne conserve jamais la valeur d'un secret détecté et retire les identifiants locaux inutiles tels que `location_name` et `hostname`.
+
+## Développement
+
+Les tests unitaires et la compilation Python sont exécutés automatiquement par GitHub Actions sur `main` et sur les pull requests.
