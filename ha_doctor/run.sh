@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
-bashio::log.info "Starting HA Doctor 0.4.0"
+bashio::log.info "Starting HA Doctor 0.4.1"
 bashio::log.info "Read-only Home Assistant configuration mount: /ha_config"
 bashio::log.info "Registry analysis uses the Home Assistant WebSocket API in read-only mode"
 
