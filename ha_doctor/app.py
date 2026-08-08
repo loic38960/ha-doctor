@@ -107,8 +107,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path in {"/", ""}:
-            html = (STATIC_DIR / "index.html").read_bytes()
-            return self._bytes(html, "text/html; charset=utf-8")
+            html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+            html = html.replace("HA Doctor 0.3.0", f"HA Doctor {VERSION}")
+            return self._bytes(html.encode("utf-8"), "text/html; charset=utf-8")
         if path.endswith("/api/status") or path == "/api/status":
             return self._json(scan_status())
         if path.endswith("/api/report") or path == "/api/report":
