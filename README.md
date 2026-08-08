@@ -1,89 +1,215 @@
 # HA Doctor
 
-HA Doctor est un prototype commercial de diagnostic **local, explicatif et en lecture seule** pour Home Assistant OS.
+**Le contrôle technique de votre Home Assistant.**
 
-## Alpha 0.6
+HA Doctor est un prototype de diagnostic **local, explicatif et en lecture seule** pour Home Assistant OS. Il analyse l'installation, corrèle les symptômes et produit un plan d'action sans appliquer de modification automatique.
 
-### Contrôle technique orienté causes racines
+## Alpha 0.7 — diagnostic corrélé et architecture
 
-- Nouveau **score V3** calculé à partir des diagnostics corrélés plutôt qu'à partir du volume brut d'entités `unavailable` / `unknown`.
-- Le score tient compte de la **priorité**, de la **sévérité**, de la **confiance**, de la **persistance dans le temps** et de l'**impact sur les automatisations**.
-- Les alertes génériques sur le volume d'entités sont conservées comme métriques techniques mais retirées du plan d'action lorsqu'une cause racine explique déjà le problème.
-- Les compteurs affichés dans le résumé exécutif proviennent désormais des incidents réellement retenus après calibration, et non des compteurs bruts du registre.
-- Le plan d'action expose toutes les actions retenues avec `total`, `displayed`, `remaining` et la liste des alertes volontairement supprimées comme bruit.
+La 0.7 est une évolution majeure du moteur : HA Doctor ne se contente plus de compter des entités ou d'énumérer des règles. Il tente de répondre à quatre questions :
 
-### Historique local
+1. **Quel est le vrai problème ?**
+2. **Quelle cause commune explique le plus de symptômes ?**
+3. **Quelles automatisations sont réellement exposées ?**
+4. **La situation s'améliore-t-elle ou se dégrade-t-elle dans le temps ?**
 
-- Conservation des **20 derniers scans** dans `/data/ha-doctor-history.json`.
-- L'historique ne stocke que : date, score, compteurs, identifiants de diagnostics actifs et nombre d'incidents de registre.
-- Aucun état brut Home Assistant, aucune valeur de secret et aucun payload brut du registre ne sont stockés dans l'historique.
-- Un incident de registre ponctuel est moins pénalisé lors de sa première apparition ; la confiance augmente lorsqu'il persiste sur plusieurs scans.
-- Détection des diagnostics nouveaux, persistants et résolus depuis le scan précédent.
+### Score V4
 
-### Impact sur les dépendances
+Le score `root_cause_temporal_v4` est calculé après corrélation des diagnostics.
 
-- Chaque diagnostic tente d'identifier les automatisations qui référencent les entités concernées.
-- Le rapport expose le nombre d'automatisations impactées et distingue un impact faible, moyen ou élevé.
-- L'impact de dépendance intervient dans le score V3 afin qu'une panne réellement utilisée par la logique Home Assistant pèse plus lourd qu'une entité isolée sans dépendance détectée.
+Il tient compte de :
 
-### Export anonymisé
+- la priorité ;
+- la sévérité ;
+- la confiance ;
+- la persistance sur plusieurs scans ;
+- l'impact réel dans le graphe d'automatisations ;
+- la différence entre actionneur, capteur, helper et fonction optionnelle ;
+- des plafonds par catégorie afin d'éviter qu'une seule panne ne soit comptée plusieurs fois.
 
-- Nouveau bouton **Rapport anonymisé**.
-- L'export anonymisé retire les `entity_id`, noms d'appareils, noms d'intégrations, noms d'automatisations et chemins de fichiers.
-- Le rapport complet reste disponible localement pour le diagnostic détaillé.
-- Le résumé compact est explicitement distingué de l'export anonymisé : compact ne signifie pas anonyme.
+Les volumes bruts `unavailable` et `unknown` restent visibles mais **ne pénalisent pas directement le score** lorsqu'une cause racine les explique.
 
-### Diagnostic utilisateur
+### Graphe de dépendances V2
 
-- Interface via Home Assistant Ingress centrée sur le **Verdict HA Doctor**, l'**évolution dans le temps**, le **plan d'action corrélé**, les **causes racines** et les **mesures brutes**.
-- Diagnostic priorisé : **À corriger maintenant / À vérifier / Optimisations / Informations**.
-- Moteur local déterministe : aucune IA externe et aucun coût de tokens.
-- Pour chaque diagnostic important : cause probable, niveau de confiance, impact, preuves utilisées, causes alternatives, contrôles ordonnés et objectif de résolution.
-- Corrélation des pannes par intégration, groupe d'appareils et appareil individuel.
-- Distinction explicite entre pannes probables et observations transitoires telles que Tesla Fleet ou Mobile App.
+Le graphe distingue désormais :
 
-### Analyse Home Assistant
+- entités de déclenchement ;
+- entités commandées ;
+- entités simplement lues ;
+- appels de services Home Assistant.
 
-- Inventaire Home Assistant via API REST.
-- Scan local des YAML sans lire `secrets.yaml`.
-- Analyse read-only des registres Home Assistant via le proxy WebSocket officiel du Supervisor.
-- Regroupement des problèmes par **intégration** et par **appareil**.
-- Distinction entre entités principales et fonctions secondaires/configuration/diagnostic.
-- Calibration des intégrations transitoires : Tesla Fleet et Mobile App ne sont pas déclarées hors ligne uniquement sur un grand nombre de valeurs `unknown`/`unavailable`.
-- Séparation entre vrais **orphelins probables** et simples entités locales `unavailable` à revoir.
-- Aucun accès direct à `.storage`.
-- Analyse des packages, `!include`, blueprints et entrées `!input`.
-- Détection des références d'entités absentes avec filtrage des services/actions Home Assistant.
-- Détection des automatisations contrôlant la même entité.
-- Réduction des faux positifs lorsque les contrôleurs sont mutuellement exclus par une condition d'état.
-- Détection d'actions consécutives identiques, IDs/alias dupliqués, boucles potentielles, `time_pattern` fréquents, longues attentes `mode: single`, doubles écritures de compteurs numériques et capteurs Integral incompatibles.
-- Contrôles Recorder et sécurité HTTP de base.
-- Détection heuristique de secrets potentiellement écrits en clair.
-- Graphe automation → triggers → entités commandées.
+Les appels comme `switch.turn_on`, `input_number.set_value`, `climate.set_temperature` ou `todo.get_items` sont filtrés : ils ne sont plus traités comme des `entity_id`.
 
-**Aucune correction automatique en Alpha 0.6.**
+Le rapport expose :
+
+- nombre de nœuds d'automatisations ;
+- nombre d'arêtes d'entités ;
+- triggers ;
+- contrôles ;
+- appels de services retirés.
+
+### Blast radius réel
+
+Une dépendance sur un actionneur physique n'a plus le même poids qu'un helper partagé.
+
+HA Doctor distingue notamment :
+
+- **actionneur** : switch, climate, cover, light, lock, siren, vacuum… ;
+- **capteur / état métier** ;
+- **helper** : input_boolean, input_number, input_datetime, counter… ;
+- **fonction optionnelle**.
+
+Le fan-out des helpers est fortement décoté afin qu'un helper de coordination utilisé partout ne fasse pas artificiellement apparaître une panne critique.
+
+Chaque diagnostic peut exposer :
+
+- automatisations impactées ;
+- automatisations réellement critiques ;
+- dépendances uniquement liées à des helpers ;
+- niveau d'impact `low / medium / high` ;
+- score d'impact pondéré.
+
+### Analyse d'architecture
+
+Le nouveau bloc `architecture_analysis` produit une cartographie synthétique de l'installation :
+
+- score de complexité ;
+- hotspots d'entités ;
+- actionneurs commandés par plusieurs automatisations ;
+- helper hubs ;
+- trigger hubs ;
+- boucles trigger → commande ;
+- automatisations les plus interconnectées ;
+- fichiers concentrant le plus de logique.
+
+Le score de complexité est informatif : une installation complexe n'est pas automatiquement considérée comme en mauvaise santé.
+
+### Régressions et historique V2
+
+HA Doctor conserve les 20 derniers scans dans `/data/ha-doctor-history.json`.
+
+Seuls sont conservés :
+
+- dates ;
+- scores ;
+- compteurs ;
+- identifiants de diagnostics ;
+- quelques métriques agrégées d'architecture.
+
+Aucune valeur brute d'état n'est persistée.
+
+La 0.7 sait distinguer :
+
+- diagnostic nouveau ;
+- persistant ;
+- récurrent ;
+- résolu ;
+- score stable, amélioré ou dégradé.
+
+L'historique 0.6/V3 reste lisible lors de la migration vers V4.
+
+### Dette de maintenance
+
+Le bloc `maintenance_debt` donne un indicateur séparé de la santé :
+
+- références YAML absentes ;
+- orphelins probables ;
+- anciennes entités locales à revoir ;
+- archives contenant potentiellement des secrets ;
+- écart entre automatisations YAML analysées et entités automation actives.
+
+Une forte dette de maintenance ne signifie pas nécessairement une panne immédiate.
+
+### Quality gates
+
+HA Doctor vérifie désormais aussi la qualité de son propre rapport :
+
+- API Home Assistant accessible ;
+- YAML parsable ;
+- blueprints résolus ;
+- registres accessibles ;
+- garanties de confidentialité respectées ;
+- graphe nettoyé ;
+- compteurs du résumé synchronisés avec le plan final.
+
+### Interface 0.7
+
+L'interface Ingress est organisée en six vues :
+
+1. **Vue d'ensemble** — score V4, verdict, évolution, priorités et quality gates ;
+2. **Plan d'action** — recherche et filtres priorité/domaine/confiance ;
+3. **Architecture** — hotspots, actionneurs partagés et automatisations complexes ;
+4. **Intégrations & appareils** — causes racines et périphériques touchés ;
+5. **Historique** — évolution du score et cycle de vie des diagnostics ;
+6. **Qualité & confidentialité** — quality gates, dette technique et garanties de privacy.
+
+### API locale
+
+Principaux endpoints Ingress :
+
+- `/api/status`
+- `/api/version`
+- `/api/report`
+- `/api/summary`
+- `/api/insights`
+- `/api/actions`
+- `/api/architecture`
+- `/api/quality`
+- `/api/history`
+- `/api/diagnostic?id=DX-...`
+- `/api/download`
+- `/api/download-summary`
+- `/api/download-anonymized`
+- `/health`
+
+## Confidentialité et sécurité
+
+HA Doctor n'effectue que des lectures dans son fonctionnement actuel.
+
+- `/ha_config` est monté en lecture seule ;
+- `secrets.yaml` n'est pas lu ;
+- `.storage` n'est pas parcouru directement ;
+- bases de données, clés privées, certificats et sauvegardes binaires sont exclus ;
+- les valeurs brutes des états ne sont pas persistées ;
+- le token Supervisor et les payloads bruts du registre ne sont pas enregistrés ;
+- aucune correction, suppression, désactivation ou redémarrage n'est exécuté automatiquement ;
+- le moteur explicatif fonctionne localement sans IA externe.
+
+L'export anonymisé retire les `entity_id`, noms d'appareils, intégrations, automatisations et chemins de fichiers tout en conservant les métriques agrégées utiles au diagnostic.
 
 ## Installation via dépôt personnalisé
 
 Dans Home Assistant :
 
 1. Ouvrir **Paramètres → Apps → App Store**.
-2. Ouvrir le menu **⋮ → Dépôts**.
+2. Ouvrir **⋮ → Dépôts**.
 3. Ajouter `https://github.com/loic38960/ha-doctor`.
 4. Rechercher les mises à jour de l'App Store.
 5. Installer ou mettre à jour **HA Doctor**.
 6. Démarrer l'App et ouvrir son interface Web.
 
-## Sécurité
+## Robustesse du packaging
 
-HA Doctor monte la configuration Home Assistant en lecture seule. `secrets.yaml`, `.storage`, les bases de données, certificats, clés et sauvegardes binaires sont exclus du scanner.
+Depuis la 0.7, le Dockerfile copie automatiquement tous les modules Python du répertoire App au lieu d'utiliser une liste de fichiers maintenue manuellement.
 
-La couche registre utilise uniquement le WebSocket Home Assistant via le Supervisor. Le payload brut des registres et le token Supervisor ne sont jamais enregistrés dans le rapport.
+La CI exécute à chaque push :
 
-Le rapport complet ne conserve pas les valeurs brutes des états Home Assistant et ne conserve jamais la valeur d'un secret détecté. L'historique temporel stocke uniquement des métadonnées de diagnostic.
+- tous les tests unitaires ;
+- compilation de tous les modules Python ;
+- validation des marqueurs UI et des versions ;
+- **construction réelle de l'image Home Assistant App** ;
+- vérification de la présence des modules packagés ;
+- import de `app`, `scanner_v070`, `intelligence_v070` et `share_export` dans le conteneur construit ;
+- vérification des assets Web dans l'image.
 
-Le moteur d'explication et de score travaille localement : `external_ai_used: false`, `automatic_fix: false`, `read_only: true`.
+Cette chaîne est conçue pour détecter avant installation les erreurs de packaging du type `ModuleNotFoundError`.
 
-## Développement
+## Limites Alpha
 
-Les tests unitaires, la compilation Python et la construction réelle de l'image Home Assistant App sont exécutés automatiquement par GitHub Actions sur `main` et sur les pull requests.
+- les références Jinja entièrement dynamiques ne sont pas toujours résolubles statiquement ;
+- les conflits complexes entre automatisations peuvent nécessiter une validation humaine ;
+- les causes racines restent des diagnostics probabilistes avec niveau de confiance ;
+- le maillage Zigbee et les logs détaillés ne sont pas encore analysés aussi profondément que le YAML et les registres ;
+- aucune correction automatique n'est effectuée.
+
+Le score HA Doctor est un indicateur de diagnostic et de maintenance, pas une certification de sécurité ou de conformité.
