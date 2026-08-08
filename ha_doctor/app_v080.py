@@ -1,7 +1,8 @@
 """HA Doctor 0.8 runtime wrapper.
 
-Keeps the stable 0.7 HTTP surface while injecting the 0.8 scanner and exposing
-flow/coverage endpoints. No write endpoint to Home Assistant is introduced.
+Keeps the stable 0.7 HTTP surface while injecting the 0.8 scanner, exposing
+flow/coverage endpoints and progressively enhancing the existing Ingress UI.
+No write endpoint to Home Assistant is introduced.
 """
 
 import os
@@ -21,6 +22,114 @@ legacy.scan = scan_v080
 _original_compact_report = legacy.compact_report
 _original_insights_report = legacy.insights_report
 _original_history_summary = legacy.history_summary
+
+
+UI_PATCH_JS = r"""
+(function(){
+  const pct080 = value => value == null ? '—' : `${Math.round(Number(value) * 100)}%`;
+
+  function normalizeImpact080(item){
+    if(!item || !item.dependency_impact) return;
+    const dep=item.dependency_impact;
+    if(dep.critical_automation_count == null && dep.high_risk_automation_count != null){
+      dep.critical_automation_count=dep.high_risk_automation_count;
+    }
+    if(dep.critical_automations == null && dep.high_risk_automations != null){
+      dep.critical_automations=dep.high_risk_automations;
+    }
+  }
+
+  function normalizeReport080(r){
+    (r?.action_plan?.items||[]).forEach(normalizeImpact080);
+    (r?.action_plan?.top||[]).forEach(normalizeImpact080);
+    (r?.recommendation_queue?.items||[]).forEach(normalizeImpact080);
+    (r?.diagnostic_explanations||[]).forEach(normalizeImpact080);
+  }
+
+  const renderAllLegacy080=renderAll;
+  renderAll=function(r){
+    normalizeReport080(r);
+    return renderAllLegacy080(r);
+  };
+
+  const renderOverviewLegacy080=renderOverview;
+  renderOverview=function(r){
+    renderOverviewLegacy080(r);
+    const g=r.dependency_graph_meta||{},c=r.automation_coverage||{},a=r.architecture_analysis||{};
+    const target=$('#view-overview');
+    if(!target) return;
+    target.insertAdjacentHTML('beforeend',`
+      <div class="sectionHead"><div><h2>Entity Flow V3</h2><p>Ce que HA Doctor comprend réellement dans les automatisations 0.8.</p></div>${badge(g.model||'entity_flow_v3','pass')}</div>
+      <div class="grid grid3">
+        <div class="miniCard"><div class="miniBig">${pct080(g.target_resolution_rate)}</div><div class="muted">cibles d'action comprises</div></div>
+        <div class="miniCard"><div class="miniBig">${pct080(c.coverage_ratio)}</div><div class="muted">automatisations runtime couvertes</div></div>
+        <div class="miniCard"><div class="miniBig">${g.unresolved_dynamic_target_count||0}</div><div class="muted">cible(s) dynamique(s) non résolue(s)</div></div>
+      </div>`);
+  };
+
+  const renderArchitectureLegacy080=renderArchitecture;
+  renderArchitecture=function(r){
+    renderArchitectureLegacy080(r);
+    const a=r.architecture_analysis||{},g=r.dependency_graph_meta||{},c=r.automation_coverage||{};
+    const target=$('#view-architecture');
+    if(!target) return;
+
+    target.insertAdjacentHTML('afterbegin',`
+      <div class="sectionHead" style="margin-top:0"><div><h2>Entity Flow V3</h2><p>Résolution sémantique des commandes, appels et cibles dynamiques.</p></div>${badge(g.model||'entity_flow_v3','pass')}</div>
+      <div class="grid grid3" style="margin-bottom:18px">
+        <div class="card"><div class="rootHead"><strong>Cibles comprises</strong>${badge(pct080(g.target_resolution_rate),Number(g.target_resolution_rate||0)>=.92?'pass':'warn')}</div><div class="miniBig">${pct080(g.target_resolution_rate)}</div><div class="rootText">${g.resolved_target_attempts||0}/${g.target_attempts||0} tentative(s) de cible résolue(s).</div></div>
+        <div class="card"><div class="rootHead"><strong>Cibles dynamiques</strong>${badge(pct080(g.dynamic_target_resolution_rate),Number(g.dynamic_target_resolution_rate||0)>=.85?'pass':'warn')}</div><div class="miniBig">${pct080(g.dynamic_target_resolution_rate)}</div><div class="rootText">${g.unresolved_dynamic_target_count||0} cible(s) restant non démontrable(s) statiquement.</div></div>
+        <div class="card"><div class="rootHead"><strong>Couverture runtime</strong>${badge(pct080(c.coverage_ratio),Number(c.coverage_ratio||0)>=.95?'pass':'warn')}</div><div class="miniBig">${pct080(c.coverage_ratio)}</div><div class="rootText">${c.yaml_automations_analyzed||0}/${c.expected_analyzable_automations||0} automation(s) disponible(s) analysée(s) · ${c.runtime_unavailable_automations||0} unavailable séparée(s).</div></div>
+        <div class="card"><div class="rootHead"><strong>Commandes</strong>${badge(String(g.control_edges||0))}</div><div class="miniBig">${g.control_edges||0}</div><div class="rootText">arête(s) de commande physique/helper après résolution.</div></div>
+        <div class="card"><div class="rootHead"><strong>Appels</strong>${badge(String(g.call_edges||0))}</div><div class="miniBig">${g.call_edges||0}</div><div class="rootText">appel(s) script/scène/automation séparé(s) des commandes.</div></div>
+        <div class="card"><div class="rootHead"><strong>Dépendances critiques</strong>${badge(String(a.critical_dependency_count||0),a.critical_dependency_count?'warn':'pass')}</div><div class="miniBig">${a.critical_dependency_count||0}</div><div class="rootText">capteur(s)/helper(s) très centraux dans la logique métier.</div></div>
+      </div>`);
+
+    const calls=a.call_hubs||[],deps=a.critical_dependencies||[];
+    if(calls.length || deps.length){
+      target.insertAdjacentHTML('beforeend',`
+        <div class="sectionHead"><div><h2>Flux partagés</h2><p>Hubs d'appel et dépendances dont la perte peut toucher plusieurs automatisations.</p></div></div>
+        <div class="grid grid2">
+          <div class="card"><strong>Call hubs</strong><div class="grid" style="margin-top:10px">${calls.slice(0,8).map(x=>`<div class="miniCard"><div class="rootHead"><strong>${esc(x.entity_id)}</strong>${badge(String(x.calling_automations||0))}</div><div class="muted">${x.calling_automations||0} appelant(s) · criticité ${x.criticality||0}/100</div></div>`).join('')||'<div class="muted">Aucun hub d’appel majeur.</div>'}</div></div>
+          <div class="card"><strong>Dépendances critiques</strong><div class="grid" style="margin-top:10px">${deps.slice(0,8).map(x=>`<div class="miniCard"><div class="rootHead"><strong>${esc(x.entity_id)}</strong>${badge(String(x.criticality||0))}</div><div class="muted">${x.triggered_automations||0} trigger(s) · ${x.referencing_automations||0} référence(s)</div></div>`).join('')||'<div class="muted">Aucune dépendance critique détectée.</div>'}</div></div>
+        </div>`);
+    }
+  };
+
+  const renderQualityLegacy080=renderQuality;
+  renderQuality=function(r){
+    renderQualityLegacy080(r);
+    const m=r.maintenance_debt||{},c=r.automation_coverage||{},g=r.dependency_graph_meta||{};
+    const target=$('#view-quality');
+    if(!target) return;
+    target.insertAdjacentHTML('beforeend',`
+      <div class="sectionHead"><div><h2>Contrôles 0.8</h2><p>Les signaux faibles, la couverture et les flux dynamiques sont mesurés séparément.</p></div></div>
+      <div class="grid grid3">
+        <div class="miniCard"><div class="miniBig">${m.probable_orphan_count||0}</div><div class="muted">orphelin(s) probable(s)</div></div>
+        <div class="miniCard"><div class="miniBig">${m.stale_registry_automation_candidates||0}</div><div class="muted">ancienne(s) automation(s) registry à revoir</div></div>
+        <div class="miniCard"><div class="miniBig">${c.coverage_gap||0}</div><div class="muted">vrai écart de couverture</div></div>
+        <div class="miniCard"><div class="miniBig">${g.call_edges||0}</div><div class="muted">appel(s) séparé(s) des commandes</div></div>
+        <div class="miniCard"><div class="miniBig">${g.possible_control_edges||0}</div><div class="muted">commande(s) dynamique(s) à confiance réduite</div></div>
+        <div class="miniCard"><div class="miniBig">${m.double_count_protection?'Oui':'Non'}</div><div class="muted">protection contre double comptage</div></div>
+      </div>`);
+  };
+})();
+"""
+
+
+def enhance_ui_v080(html):
+    """Inject 0.8 UI metrics while keeping the stable 0.7 static bundle intact."""
+    if not isinstance(html, str):
+        return html
+    html = html.replace("__HA_DOCTOR_VERSION__", VERSION)
+    html = html.replace(
+        "HA Doctor 0.7 corrèle les causes racines, la persistance et le blast radius des dépendances",
+        "HA Doctor 0.8 corrèle les causes racines et comprend les flux dynamiques, appels et dépendances",
+    )
+    marker = "refreshStatus();loadReport();startPolling();"
+    if marker in html and "Entity Flow V3" not in html.split(marker, 1)[0][-6000:]:
+        html = html.replace(marker, UI_PATCH_JS + "\n" + marker, 1)
+    return html
 
 
 def compact_report_v080(report):
@@ -63,6 +172,11 @@ class Handler(legacy.Handler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+
+        if path in {"/", ""}:
+            html = (legacy.STATIC_DIR / "index.html").read_text(encoding="utf-8")
+            html = enhance_ui_v080(html)
+            return self._bytes(html.encode("utf-8"), "text/html; charset=utf-8")
 
         if path.endswith("/api/version") or path == "/api/version":
             return self._json({
