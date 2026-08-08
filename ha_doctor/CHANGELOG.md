@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.0
+
+- Nouveau moteur sémantique `entity_flow_v3` au-dessus du moteur de causes racines 0.7.
+- Résolution statique des cibles d'actions dynamiques sans exécuter Jinja : variables simples, chaînes de variables et ensembles de cibles possibles.
+- Les commandes telles que `entity_id: "{{ pompe_entity }}"` ou `entity_id: "{{ next_clim }}"` peuvent maintenant être reliées aux actionneurs physiques possibles.
+- Ajout d'un niveau de confiance aux contrôles dynamiques : cible certaine, lignée de variable, ensemble possible ou inférence par domaine.
+- Les cibles dynamiques non démontrables restent explicitement `unresolved` au lieu d'être inventées.
+- Durcissement contre les faux positifs : les noms de services Home Assistant comme `switch.turn_on` ne peuvent plus être déduits comme des entités pendant le fallback dynamique.
+- Les alias explicites des automatisations sont prioritaires sur les clés de mapping de package lors de l'analyse sémantique.
+- Nouveau type d'arête `calls` séparant les appels de scripts, scènes et automatisations des commandes d'actionneurs.
+- Les scripts de notification partagés deviennent des hubs d'appel et ne sont plus assimilés à de simples lectures ou à des commandes physiques.
+- Nouveau graphe de blast radius `blast_radius_v2_flow` utilisant triggers, contrôles, appels, lectures et confiance des cibles dynamiques.
+- Nouveau modèle d'architecture `architecture_v2_flow` : actionneurs partagés, helper hubs, trigger hubs, call hubs, dépendances critiques et boucles de contrôle.
+- Refonte du `risk_index` des automatisations : les commandes physiques et systèmes de sécurité pèsent davantage ; le fan-out de lecture est désormais logarithmique et plafonné.
+- Une automatisation qui lit des dizaines d'entités ne peut plus devenir artificiellement plus risquée qu'une automatisation qui pilote plusieurs actionneurs physiques.
+- Nouveau `automation_coverage_v2` : la couverture compare les YAML analysés aux automatisations runtime actuellement disponibles.
+- Les anciennes entités `automation.*` en état `unavailable` sont suivies séparément et ne créent plus automatiquement un faux trou de couverture.
+- Le finding `HD-CFG-005` est recalibré pour afficher la couverture des automatisations réellement chargées.
+- Nouvelle dette de maintenance `maintenance_debt_v2` avec séparation des références cassées, orphelins probables, candidats registry faibles, archives sensibles, couverture réelle et hygiène d'automatisation.
+- Protection explicite contre le double comptage des mêmes anciennes automatisations dans la couverture et la dette registry.
+- Nouveaux quality gates `quality_gates_v2` : résolution des flux, couverture des automatisations et continuité de l'historique s'ajoutent aux contrôles API/YAML/registry/confidentialité.
+- Le quality gate du graphe mesure désormais le taux réel de cibles comprises et le nombre de cibles dynamiques non résolues.
+- Nouveau endpoint `/api/flow` exposant uniquement les métriques sémantiques, les cibles non résolues compactes et les garanties de confidentialité.
+- Nouveau endpoint `/api/coverage` pour la couverture runtime et la dette de maintenance V2.
+- `/api/summary`, `/api/insights` et `/api/history` sont enrichis avec les agrégats 0.8.
+- Nouveau schéma `ha-doctor-report/0.8`, compatible avec les rapports 0.5, 0.6 et 0.7.
+- Le Score V4 est volontairement conservé sur la même échelle que 0.7 afin de ne pas casser l'historique temporel pendant la migration du graphe.
+- L'historique ajoute uniquement des métriques agrégées de flux/couverture ; aucun YAML brut ni texte de template n'est persisté.
+- Nouvelles garanties de confidentialité : aucun contenu brut de cible dynamique, payload d'appel de script ou YAML reparsé n'est enregistré dans le rapport.
+- Nouveau runtime `app_v080.py` conservant les endpoints et verrous éprouvés de la 0.7 tout en injectant le scanner 0.8.
+- Le packaging Docker reste robuste grâce à `COPY *.py ./` et inclut automatiquement les nouveaux moteurs 0.8.
+- CI migrée en 0.8 avec tests unitaires, compilation Python, cohérence de version, construction réelle de l'image Home Assistant App, présence des modules et smoke tests d'import dans le conteneur.
+- Ajout de tests de non-régression dédiés aux cibles dynamiques, appels de scripts, confidentialité des templates non résolus, couverture 52/52 avec entrées registry unavailable séparées, dette sans double comptage et scoring des automations à fort fan-out.
+- Toujours aucune IA externe, aucun auto-fix et aucune modification automatique de Home Assistant.
+
 ## 0.7.0
 
 - Nouvelle architecture de diagnostic `root_cause_temporal_v4` et **Score V4**.
