@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- Analyse read-only des registres Home Assistant via le proxy WebSocket officiel du Supervisor, sans lecture de `.storage`.
+- Regroupement des entités problématiques par intégration (`platform`) afin d'identifier les pannes communes au lieu de compter chaque entité séparément.
+- Regroupement par appareil à partir du Device Registry avec état `Hors ligne`, `Dégradé`, `À surveiller` ou `Secondaire`.
+- Les entités `config`, `diagnostic`, boutons, mises à jour et autres fonctions secondaires sont distinguées des entités principales dans le calcul de santé des groupes.
+- Première détection d'entités probablement orphelines : entrées locales actives du registre sans état, ou entités locales indisponibles sans appareil associé.
+- Les candidats orphelins sont classés par confiance et ne déclenchent jamais de suppression automatique.
+- Nouveau finding `HD-REG-001` classé `À vérifier` lorsque des candidats orphelins existent.
+- Nouvelle section d'interface `Intégrations & appareils` et liste des candidats orphelins.
+- Le score 0.3.2 est volontairement conservé : les nouveaux diagnostics de registre sont en preview et ne sont pas encore scorés.
+- Aucun payload brut du registre ni token Supervisor n'est persisté dans le rapport.
+- Fallback gracieux : si le WebSocket/registre est indisponible, le diagnostic YAML/états continue normalement.
+
 ## 0.3.2
 
 - Correction du triage des entités `notify.*` en état `unknown` : elles sont désormais exclues comme entités stateless avant le regroupement.
