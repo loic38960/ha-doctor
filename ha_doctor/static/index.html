@@ -64,14 +64,14 @@
 <div class="loading" id="loading"><div class="loaderBox"><div class="spinner"></div><strong>HA Doctor analyse votre installation…</strong><div class="sub">Aucune modification n'est effectuée.</div></div></div>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><div class="logo">🩺</div><div><h1>HA Doctor</h1><div class="sub">Contrôle technique de votre Home Assistant · Alpha 0.1</div></div></div>
+    <div class="brand"><div class="logo">🩺</div><div><h1>HA Doctor</h1><div class="sub">Contrôle technique de votre Home Assistant · Alpha 0.2</div></div></div>
     <div class="actions"><button class="primary" id="scanBtn">Nouvelle analyse</button><a class="btn secondary" id="downloadBtn" href="#">Télécharger le JSON</a></div>
   </div>
 
-  <div class="privacy">🔒 <strong>Mode lecture seule.</strong> secrets.yaml n'est pas lu, les états bruts ne sont pas conservés dans le rapport et HA Doctor V0.1 n'effectue aucune correction automatique.</div>
+  <div class="privacy">🔒 <strong>Mode lecture seule.</strong> secrets.yaml n'est pas lu, les états bruts ne sont pas conservés dans le rapport et HA Doctor Alpha 0.2 n'effectue aucune correction automatique.</div>
 
   <div id="content"><div class="card empty">Chargement du dernier rapport…</div></div>
-  <div class="footer">HA Doctor 0.1.0 · Rapport local · Les détections automatiques peuvent nécessiter une validation humaine.</div>
+  <div class="footer">HA Doctor 0.2.0 · Rapport local · Les détections automatiques peuvent nécessiter une validation humaine.</div>
 </div>
 <script>
 const $ = (s) => document.querySelector(s);
@@ -80,7 +80,7 @@ const api = (name) => ingressBase + 'api/' + name;
 let currentFilter = 'all';
 let lastReport = null;
 const severityLabel = {critical:'Critique', high:'Élevé', medium:'Moyen', low:'Faible', info:'Info'};
-const domainLabel = {system:'Système', entities:'Entités', automations:'Automatisations', configuration:'Configuration'};
+const domainLabel = {system:'Système', entities:'Entités', automations:'Automatisations', configuration:'Configuration', security:'Sécurité', performance:'Performances'};
 
 function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function scoreStatus(score){ if(score >= 90) return 'Excellent'; if(score >= 75) return 'Bon'; if(score >= 60) return 'À surveiller'; if(score >= 40) return 'À corriger'; return 'Critique'; }
@@ -91,7 +91,7 @@ function render(report){
   const s = report.scores || {global:0,domains:{}};
   const inv = report.inventory || {};
   const counts = report.severity_counts || {};
-  const domains = [['system','Système'],['entities','Entités'],['automations','Automatisations'],['configuration','Configuration']];
+  const domains = [['system','Système'],['entities','Entités'],['automations','Automatisations'],['configuration','Configuration'],['security','Sécurité'],['performance','Performances']];
   let html = `
     <div class="hero">
       <div class="card scoreCard"><div class="score">${s.global ?? 0}</div><div class="scoreLabel">sur 100</div><div class="status">${scoreStatus(s.global ?? 0)}</div></div>
@@ -102,7 +102,7 @@ function render(report){
       <div class="card metric"><strong>${inv.automations_detected ?? 0}</strong><span>Automatisations YAML</span></div>
       <div class="card metric"><strong>${inv.unavailable_count ?? 0}</strong><span>Unavailable</span></div>
       <div class="card metric"><strong>${inv.yaml_files_scanned ?? 0}</strong><span>Fichiers YAML</span></div>
-      <div class="card metric"><strong>${Object.keys(inv.domains || {}).length}</strong><span>Domaines</span></div>
+      <div class="card metric"><strong>${inv.blueprints_detected ?? 0}</strong><span>Blueprints analysés</span></div>
     </div>
     <div class="sectionTitle"><h2>Diagnostic</h2><div class="filters">
       <button class="filter active" data-filter="all">Tous ${(report.findings||[]).length}</button>
