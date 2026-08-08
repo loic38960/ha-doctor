@@ -12,7 +12,7 @@ from share_export import build_anonymized_report
 from temporal_v060 import load_history
 
 PORT = 8099
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 HISTORY_PATH = DATA_DIR / "ha-doctor-history.json"
@@ -79,6 +79,7 @@ def load_report():
 
 
 def compact_report(report):
+    """Smaller diagnostic report. Compact does not mean anonymous."""
     if not isinstance(report, dict):
         return None
     compact = {}
@@ -90,6 +91,7 @@ def compact_report(report):
     ):
         if key in report:
             compact[key] = report[key]
+
     inventory = report.get("inventory") or {}
     compact["inventory_summary"] = {
         "states": inventory.get("states"),
@@ -99,6 +101,45 @@ def compact_report(report):
         "unavailable_count": inventory.get("unavailable_count"),
         "unknown_count": inventory.get("unknown_count"),
     }
+
+    registry = report.get("registry_analysis") or {}
+    if registry:
+        integration = registry.get("integration_health") or {}
+        devices = registry.get("device_health") or {}
+        orphan = registry.get("orphan_analysis") or {}
+        compact["registry_summary"] = {
+            "available": registry.get("available"),
+            "entity_registry_count": registry.get("entity_registry_count"),
+            "device_registry_count": registry.get("device_registry_count"),
+            "integration_health": {
+                "total": integration.get("total"),
+                "affected": integration.get("affected"),
+                "problematic": integration.get("problematic"),
+                "offline": integration.get("offline"),
+                "groups": [
+                    item for item in (integration.get("groups") or [])
+                    if item.get("status") in {"offline", "degraded", "watch"}
+                ][:15],
+            },
+            "device_health": {
+                "total": devices.get("total"),
+                "affected": devices.get("affected"),
+                "problematic": devices.get("problematic"),
+                "offline": devices.get("offline"),
+                "groups": [
+                    item for item in (devices.get("groups") or [])
+                    if item.get("status") in {"offline", "degraded", "watch"}
+                ][:15],
+            },
+            "orphan_analysis": {
+                "probable_orphan_count": orphan.get("probable_orphan_count", orphan.get("high_confidence_count", 0)),
+                "review_candidate_count": orphan.get("review_candidate_count", 0),
+                "probable_orphans": (orphan.get("probable_orphans") or [])[:20],
+                "local_unavailable_candidates": (orphan.get("local_unavailable_candidates") or [])[:20],
+            },
+            "errors": registry.get("errors") or [],
+        }
+
     compact["export_meta"] = {
         "type": "diagnostic_summary",
         "full_dependency_graph_included": False,
