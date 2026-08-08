@@ -39,7 +39,7 @@ def load_report():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HADoctor/0.1"
+    server_version = "HADoctor/0.2"
 
     def log_message(self, fmt, *args):
         print(f"[HA Doctor] {self.address_string()} - {fmt % args}")
@@ -85,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
                 headers={"Content-Disposition": 'attachment; filename="ha-doctor-report.json"'},
             )
         if path.endswith("/health") or path == "/health":
-            return self._json({"status": "ok", "version": "0.1.0"})
+            return self._json({"status": "ok", "version": "0.2.0"})
         return self._json({"error": "Not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self):

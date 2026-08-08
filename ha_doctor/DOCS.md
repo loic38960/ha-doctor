@@ -1,4 +1,4 @@
-# HA Doctor 0.1.0
+# HA Doctor 0.2.0 Alpha
 
 ## Fonctionnement
 
@@ -12,25 +12,31 @@ HA Doctor effectue un audit local en lecture seule. Cette version ne corrige, ne
 
 ## Fichiers explicitement ignorés
 
-- `secrets.yaml`
-- `.storage/auth*`
-- `.storage/onboarding`
+- `secrets.yaml` / `secrets.yml`
+- l'intégralité de `.storage`
 - bases SQLite (`*.db`, `*.sqlite*`)
 - certificats et clés (`*.pem`, `*.key`, `*.crt`, `*.p12`, `*.pfx`)
 - sauvegardes et archives
+
+## Analyse des blueprints
+
+HA Doctor 0.2 charge les blueprints présents dans `blueprints/automation`, applique les valeurs fournies via `use_blueprint.input` et résout les références `!input`. Cela permet d'analyser les entités réellement utilisées par chaque instance de blueprint.
+
+Les valeurs par défaut présentes dans un blueprint non utilisé ne sont pas considérées comme des références actives.
 
 ## Résultats
 
 L'interface affiche :
 
 - score global
-- scores Système / Entités / Automatisations / Configuration
+- scores Système / Entités / Automatisations / Configuration / Sécurité / Performances
 - problèmes Critique / Élevé / Moyen / Faible / Information
 - dépendances détectées
 - téléchargement du rapport JSON
 
-## Limitations V0.1
+## Limitations Alpha 0.2
 
-- Les références dynamiques créées par templates Jinja peuvent provoquer des faux positifs.
-- Le scanner n'analyse pas encore les registres internes complets de Home Assistant.
-- Zigbee2MQTT, ZHA, MQTT, Recorder et sauvegardes auront des règles dédiées dans les versions suivantes.
+- Certaines références construites entièrement dynamiquement en Jinja ne peuvent pas être résolues statiquement.
+- Les conflits entre automations sont une analyse prudente : HA Doctor sait reconnaître certaines exclusions par condition `state`, mais pas encore toutes les exclusions exprimées en templates Jinja.
+- Le scanner n'analyse pas encore Zigbee2MQTT, ZHA, MQTT et les sauvegardes avec des règles dédiées.
+- Un diagnostic reste une aide à la décision et ne remplace pas la validation humaine avant modification.
