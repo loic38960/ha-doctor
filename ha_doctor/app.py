@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from scanner_patch import scan
 
 PORT = 8099
-VERSION = "0.2.4"
+VERSION = "0.3.0"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 STATIC_DIR = Path("/app/static")
