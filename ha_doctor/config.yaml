@@ -1,7 +1,7 @@
 name: "HA Doctor"
-version: "0.2.4"
+version: "0.3.0"
 slug: "ha_doctor"
-description: "Audit local et en lecture seule de votre installation Home Assistant"
+description: "Audit local, priorisé et en lecture seule de votre installation Home Assistant"
 arch:
   - amd64
   - aarch64
