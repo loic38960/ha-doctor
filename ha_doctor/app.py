@@ -12,7 +12,7 @@ from share_export import build_anonymized_report
 from temporal_v060 import load_history
 
 PORT = 8099
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 HISTORY_PATH = DATA_DIR / "ha-doctor-history.json"
