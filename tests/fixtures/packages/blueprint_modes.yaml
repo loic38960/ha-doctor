@@ -1,0 +1,19 @@
+automation:
+  - id: mode_a
+    alias: Mode A
+    use_blueprint:
+      path: pump_mode.yaml
+      input:
+        mode_value: A
+        pump: switch.pompe_blueprint
+        mode: input_select.mode_test
+        source_sensor: sensor.surplus_pv
+  - id: mode_b
+    alias: Mode B
+    use_blueprint:
+      path: pump_mode.yaml
+      input:
+        mode_value: B
+        pump: switch.pompe_blueprint
+        mode: input_select.mode_test
+        source_sensor: sensor.surplus_pv

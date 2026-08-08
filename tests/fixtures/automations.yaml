@@ -7,6 +7,12 @@
     - service: switch.turn_on
       target:
         entity_id: switch.pompe_piscine
+    - action: notify.mobile_app_test
+      data:
+        message: Test doublon
+    - action: notify.mobile_app_test
+      data:
+        message: Test doublon
     - delay: '00:10:00'
   mode: single
 - id: '2'

@@ -1,5 +1,6 @@
 homeassistant:
   name: Test
+  packages: !include_dir_named packages
 mqtt:
   password: super-secret-value
 sensor:
@@ -7,3 +8,9 @@ sensor:
     sensors:
       exemple:
         value_template: "{{ states('sensor.inexistant') }}"
+recorder:
+  purge_keep_days: 7
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.30.33.0/24

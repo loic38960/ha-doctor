@@ -1,0 +1,24 @@
+blueprint:
+  name: Test pump mode
+  domain: automation
+  input:
+    pump:
+      default: switch.blueprint_default_unused
+    mode:
+      default: input_select.mode_test
+    mode_value:
+      default: A
+    source_sensor:
+      default: sensor.blueprint_default_unused
+trigger:
+  - platform: state
+    entity_id: !input source_sensor
+condition:
+  - condition: state
+    entity_id: !input mode
+    state: !input mode_value
+action:
+  - action: switch.turn_on
+    target:
+      entity_id: !input pump
+mode: restart
