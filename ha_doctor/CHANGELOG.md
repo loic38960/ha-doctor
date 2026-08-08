@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.7.0
+
+- Nouvelle architecture de diagnostic `root_cause_temporal_v4` et **Score V4**.
+- Le score est calculé après corrélation des causes racines, déduplication du bruit et analyse de dépendances.
+- Ajout de plafonds de pénalité par domaine afin d'éviter de compter plusieurs fois les symptômes d'une même panne.
+- Le volume brut des entités `unavailable` / `unknown` reste informatif et n'est pas scoré directement lorsqu'une cause racine l'explique.
+- Nouveau graphe `entity_graph_v2` distinguant triggers, commandes, lectures et appels de services Home Assistant.
+- Les appels tels que `switch.turn_on`, `input_number.set_value`, `climate.set_temperature` et `todo.get_items` ne sont plus traités comme des entités.
+- Nouveau calcul de blast radius pondéré : les actionneurs et capteurs métier pèsent davantage que les helpers de coordination.
+- Les fan-outs de `input_boolean`, `input_number`, `input_datetime`, `counter` et autres helpers sont fortement décotés dans le calcul de criticité.
+- Chaque diagnostic expose maintenant les automatisations réellement critiques, les dépendances helper-only et un score d'impact pondéré.
+- Nouveau bloc `architecture_analysis` : complexité, hotspots d'entités, actionneurs partagés, helper hubs, trigger hubs, boucles de contrôle et profils d'automatisations complexes.
+- Nouveau bloc `regression_analysis` avec état `stable`, `improved` ou `degraded`, variation de score, nouveaux diagnostics et diagnostics résolus.
+- Historique temporel V2 compatible avec les snapshots V3 de la 0.6.
+- Les nouveaux diagnostics ont désormais un `first_seen` explicite au lieu de `null`.
+- Nouveau bloc `maintenance_debt` indépendant de l'indice de santé : références absentes, candidats locaux, orphelins, archives et couverture YAML.
+- Nouveau système de `quality_gates` pour vérifier API, parsing YAML, blueprints, registres, confidentialité, graphe et cohérence interne du rapport.
+- Correction de l'incohérence possible entre `diagnostic_summary` et `action_plan` : le résumé est reconstruit depuis le plan corrélé final.
+- Nouveau champ `why_now` dans le plan d'action pour expliquer la priorité de traitement.
+- Nouveau bloc `recommendation_queue` présentant les premières actions recommandées.
+- Nouveau schéma explicite `ha-doctor-report/0.7` et bloc `report_schema`.
+- Nouveaux endpoints `/api/version`, `/api/insights`, `/api/actions`, `/api/architecture`, `/api/quality` et `/api/diagnostic?id=...`.
+- `/api/history` accepte les anciens scores V3 et expose les métriques V4 disponibles.
+- Export anonymisé enrichi avec score V4, architecture, régression, dette de maintenance et quality gates sous forme agrégée uniquement.
+- Refonte majeure de l'interface en six vues : Vue d'ensemble, Plan d'action, Architecture, Intégrations & appareils, Historique, Qualité & confidentialité.
+- Le plan d'action dispose maintenant de filtres texte, priorité, domaine et confiance.
+- Nouvelle vue Architecture avec hotspots et automatisations les plus interconnectées.
+- Nouvelle vue Historique avec courbe du score et diagnostics nouveaux/persistants/résolus.
+- Nouvelle vue Qualité & confidentialité avec quality gates et indicateur de dette de maintenance.
+- Renforcement du packaging Docker : tous les modules Python du contexte App sont copiés automatiquement via `COPY *.py ./`.
+- Ajout de smoke tests sur l'image Docker réelle pour vérifier la présence et l'import de `scanner_v070`, `intelligence_v070`, `share_export` et `app`.
+- Ajout de tests de non-régression spécifiques au filtrage des services, à la pondération helper/actionneur, au score indépendant des volumes bruts, à la migration temporelle, à l'anonymisation et à la cohérence du rapport.
+- La CI construit désormais l'image Home Assistant App réelle et vérifie ses modules et assets avant validation.
+- Toujours aucune IA externe, aucun auto-fix et aucune modification automatique de Home Assistant.
+
 ## 0.6.0
 
 - Nouveau score `root_cause_temporal_v1` calculé après corrélation des causes racines.
@@ -118,25 +153,3 @@
 - Correction du démarrage avec l'image de base Home Assistant/S6 : ajout de `init: false` requis par S6 Overlay v3.
 - Logs de démarrage explicites et sortie Python non bufferisée pour faciliter le diagnostic.
 - Mise à jour de l'URL du dépôt après renommage en `loic38960/ha-doctor`.
-
-## 0.2.0
-
-- Résolution des automations basées sur des blueprints et des références `!input`.
-- Analyse des packages Home Assistant.
-- Détection des actions consécutives strictement identiques.
-- Détection des IDs et alias d'automatisations dupliqués.
-- Détection de boucles potentielles entre triggers et entités commandées.
-- Détection des `time_pattern` très fréquents.
-- Analyse des délais et timeouts de `wait_template` / `wait_for_trigger`.
-- Conflits multi-automations plus intelligents grâce aux conditions d'état mutuellement exclusives.
-- Nouveaux domaines de score Sécurité et Performances.
-- Contrôles de base `trusted_proxies` et Recorder.
-- Réduction des faux positifs provenant des valeurs par défaut des blueprints non utilisés.
-
-## 0.1.0
-
-- Première version alpha.
-- Scanner read-only.
-- API Home Assistant + informations Supervisor.
-- Analyse YAML, états, automations et dépendances.
-- Score de santé et export JSON.
