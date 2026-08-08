@@ -4,8 +4,6 @@ Keeps the proven 0.2.x scanner intact while adding runtime filtering based on
 Home Assistant's own read-only service registry and a few targeted checks found
 on the first real-world audit.
 """
-from pathlib import Path
-
 import scanner as base
 from rules import build_scores, finding
 
@@ -84,6 +82,12 @@ def _integration_sensor_issues():
         rel = str(path.relative_to(root))
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        # Avoid parsing hundreds of unrelated files a second time.
+        if "platform: integration" not in text and "platform: 'integration'" not in text and 'platform: "integration"' not in text:
+            continue
+        try:
             data = base.yaml.load(text, Loader=base.HALoader)
         except Exception:
             continue
