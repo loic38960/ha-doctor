@@ -7,10 +7,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from scanner_v041 import scan
+from scanner_v050 import scan
 
 PORT = 8099
-VERSION = "0.4.1"
+VERSION = "0.5.0"
 DATA_DIR = Path("/data")
 REPORT_PATH = DATA_DIR / "report.json"
 STATIC_DIR = Path("/app/static")
