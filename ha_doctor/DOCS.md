@@ -1,152 +1,291 @@
-# HA Doctor 0.5.0 Alpha
+# HA Doctor 0.7.0 Alpha
 
-## Fonctionnement
+## Objectif
 
-HA Doctor effectue un diagnostic local en lecture seule. Il ne corrige, ne supprime, ne redémarre et ne modifie rien dans Home Assistant.
+HA Doctor effectue un diagnostic local et en lecture seule d'une installation Home Assistant. Il ne corrige, ne supprime, ne redémarre et ne modifie rien automatiquement.
 
-La chaîne 0.5 est organisée en couches :
+La 0.7 transforme le scanner en moteur de diagnostic corrélé : les règles statiques, les registres, le graphe d'automatisations et l'historique local sont combinés pour produire des causes racines, un blast radius et un plan d'action final cohérent.
+
+## Chaîne d'analyse
+
+La chaîne actuelle est organisée ainsi :
 
 1. collecte Home Assistant / Supervisor ;
-2. analyse YAML et automatisations ;
-3. triage des états `unavailable` / `unknown` ;
-4. analyse des Entity Registry / Device Registry via WebSocket ;
-5. calibration des cas transitoires ;
-6. moteur explicatif local ;
-7. plan d'action et interface utilisateur.
+2. analyse YAML, packages et blueprints ;
+3. règles statiques sur configuration et automatisations ;
+4. triage `unavailable` / `unknown` ;
+5. Entity Registry / Device Registry via WebSocket ;
+6. corrélation intégration / appareil / cluster ;
+7. moteur explicatif local ;
+8. nettoyage du graphe de dépendances ;
+9. blast radius pondéré ;
+10. contexte temporel et régressions ;
+11. score V4 ;
+12. analyse d'architecture et dette de maintenance ;
+13. synchronisation du plan, du résumé et des quality gates ;
+14. export et interface.
 
 ## Données lues
 
-- API Home Assistant : configuration générale, états courants et liste des services/actions disponibles.
-- API Supervisor : informations générales accessibles au rôle `default`.
+- API Home Assistant : configuration générale, états courants et services/actions disponibles.
+- API Supervisor : informations accessibles au rôle configuré.
 - WebSocket Home Assistant via le proxy Supervisor : Entity Registry et Device Registry.
-- `/ha_config` : fichiers YAML autorisés, montés en lecture seule.
+- `/ha_config` : YAML autorisés, montés en lecture seule.
 
-Les états bruts servent uniquement pendant l'analyse et ne sont pas persistés dans le rapport. Les payloads bruts des registres et le token Supervisor ne sont pas persistés non plus.
+Les états courants sont nécessaires au calcul mais ne sont pas persistés comme historique brut.
 
-## Fichiers explicitement ignorés
+## Données explicitement exclues
 
-- `secrets.yaml` / `secrets.yml`
-- l'intégralité de `.storage`
-- bases SQLite (`*.db`, `*.sqlite*`)
-- certificats et clés (`*.pem`, `*.key`, `*.crt`, `*.p12`, `*.pfx`)
-- sauvegardes binaires et archives non YAML
+- `secrets.yaml` / `secrets.yml` ;
+- `.storage` en accès fichier direct ;
+- bases SQLite ;
+- certificats et clés ;
+- sauvegardes binaires ;
+- token Supervisor ;
+- payload brut des registres dans le rapport ;
+- valeurs de secrets détectés.
 
-Les anciens YAML d'archive peuvent être parcourus uniquement pour détecter la présence potentielle de secrets, sans enregistrer leur valeur.
+## Graphe de dépendances V2
 
-## Priorités utilisateur
+Le graphe `entity_graph_v2` distingue quatre relations :
 
-Chaque finding technique est associé à une priorité :
+- `triggers_on` : entités qui déclenchent une automatisation ;
+- `controls` : entités commandées par l'automatisation ;
+- `reads` : entités lues sans être trigger ni cible de commande ;
+- `entities` : union des entités réelles du nœud.
 
-- `À corriger maintenant` : risque ou erreur suffisamment probable pour être traité en priorité.
-- `À vérifier` : anomalie crédible mais nécessitant une validation du contexte.
-- `Optimisations` : dette technique, robustesse ou amélioration de maintenance.
-- `Informations` : contexte du scan, couverture et éléments non bloquants.
+Les appels de service tels que `switch.turn_on`, `input_number.set_value`, `climate.set_temperature` et `todo.get_items` sont retirés des références d'entités.
 
-## Moteur explicatif 0.5
+Le bloc `dependency_graph_meta` expose le nombre de références avant nettoyage, services filtrés, arêtes d'entités, triggers et contrôles.
 
-Le moteur `explain_v1` est **déterministe et local**. Il n'appelle aucun LLM ni service d'IA externe.
+## Classification des dépendances
 
-Pour chaque diagnostic, HA Doctor peut produire :
+Les entités sont classées afin de calibrer leur impact :
 
-- `diagnosis` : interprétation du constat ;
-- `confidence` / `confidence_score` : niveau de certitude ;
-- `impact` : conséquence potentielle ;
-- `probable_causes` : causes plausibles classées sans prétendre à une certitude absolue ;
-- `evidence` : preuves compactes déjà présentes dans le rapport redacted ;
-- `checks` : contrôles manuels ordonnés ;
-- `resolution_goal` : état cible attendu ;
-- `safe_to_ignore_when` : conditions dans lesquelles l'alerte peut être relativisée ;
-- `automatic_fix: false` ;
-- `read_only: true`.
+- `actuator` : actionneur physique ou logique pilotable ;
+- `sensor` : information utilisée par la logique ;
+- `helper` : état de coordination Home Assistant ;
+- `optional` : contrôle ou paramètre secondaire ;
+- `other`.
 
-Les preuves du moteur explicatif n'incluent jamais les valeurs de secrets. Les exemples sont limités à des métadonnées telles que fichier, ligne, clé, entity_id, alias ou groupe détecté.
+Un helper partagé ne doit pas peser comme une pompe, un chauffage, une serrure ou une sirène. Le calcul de `dependency_impact` applique donc un poids fortement inférieur aux helpers.
+
+Chaque diagnostic peut recevoir :
+
+- `impacted_automation_count` ;
+- `critical_automation_count` ;
+- `helper_only_automation_count` ;
+- `trigger_dependency_count` ;
+- `control_dependency_count` ;
+- `weighted_impact_score` ;
+- `score_multiplier` ;
+- `top_entities`.
+
+## Architecture
+
+Le bloc `architecture_analysis` est informatif et ne constitue pas une pénalité automatique.
+
+Il expose :
+
+- `complexity_score` / `complexity_label` ;
+- `entity_dependency_count` ;
+- `entity_edge_count` ;
+- `shared_actuator_count` ;
+- `helper_hub_count` ;
+- `trigger_hub_count` ;
+- `closed_loop_count` ;
+- `top_hotspots` ;
+- `shared_actuators` ;
+- `helper_hubs` ;
+- `trigger_hubs` ;
+- `closed_loops` ;
+- `automation_risk_profiles` ;
+- `top_sources`.
+
+Le but est d'identifier les zones où une future modification est susceptible d'avoir un effet large.
 
 ## Corrélation des causes racines
 
-La 0.5 ne se contente plus de compter des entités. Elle essaie de déterminer si plusieurs symptômes partagent une cause commune.
+Le moteur réutilise les incidents déterministes issus des registres :
 
-### Intégration entièrement indisponible
+- intégration hors ligne ;
+- intégration partiellement dégradée ;
+- appareil isolé hors ligne ;
+- cluster d'appareils partageant un motif ;
+- observations transitoires.
 
-Si la quasi-totalité des entités principales d'une intégration est touchée et que plusieurs appareils suivent le même motif, HA Doctor crée un diagnostic au niveau de l'intégration au lieu de répéter les appareils individuellement.
+Les diagnostics génériques `HD-ENT-001` et `HD-ENT-003` peuvent rester dans les findings techniques mais sont retirés du plan d'action si des causes racines expliquent déjà le volume d'entités concerné.
 
-### Appareil isolé hors ligne
+`HD-REG-002` de faible confiance est également supprimé du plan lorsque le registre ne fournit aucune preuve d'orphelin probable.
 
-Si toutes les entités principales d'un appareil sont touchées mais que l'intégration reste globalement saine, l'incident est attribué à l'appareil.
+## Temporalité V2
 
-### Plusieurs appareils d'un même sous-ensemble
+L'historique local est limité aux 20 derniers scans.
 
-Lorsque plusieurs appareils distincts d'une intégration sont entièrement touchés alors que d'autres restent sains, HA Doctor peut créer un cluster de cause commune : passerelle, zone réseau/radio, ancienne association ou sous-ensemble volontairement hors tension.
+Chaque snapshot conserve uniquement :
 
-### Cas transitoires
+- date ;
+- score V4 ;
+- éventuel score historique V3 ;
+- diagnostics actifs ;
+- incidents de registre ;
+- compteurs de priorité ;
+- compteurs `unavailable` / `unknown` ;
+- quelques métriques d'architecture ;
+- score de dette de maintenance.
 
-Tesla Fleet et Mobile App sont volontairement traités avec prudence. Un volume important de valeurs `unknown` ou de capteurs mobiles non remontés ne suffit pas à conclure à une panne.
+Un diagnostic peut être :
 
-Ces cas peuvent apparaître dans `registry_observations` plutôt que dans le plan d'action.
+- `baseline` ;
+- `new` ;
+- `persistent` ;
+- `recurrent`.
 
-## Santé des entités
+Pour les incidents du registre, un signal ponctuel est moins pénalisé. Sa pondération augmente progressivement s'il persiste sur plusieurs scans.
 
-HA Doctor regroupe les entités `unavailable` et `unknown` en familles :
+La migration accepte les anciennes entrées `health_score_v3` afin de ne pas perdre l'historique 0.6.
 
-- Mobiles / Companion App
-- Paramètres d'appareils
-- Présence / localisation
-- Capteurs
-- Appareils / actionneurs
-- mises à jour / fonctions secondaires
-- autres domaines
+## Régressions
 
-Les entités stateless connues (`scene`, `button`, `event`, `stt`, etc.) sont filtrées autant que possible avant le triage `unknown`.
+`regression_analysis` compare le scan courant au précédent et expose :
 
-## Registres et orphelins
+- variation du score ;
+- nouveaux diagnostics ;
+- nouvelles priorités immédiates ;
+- diagnostics résolus ;
+- diagnostics persistants ;
+- état `stable`, `improved` ou `degraded` ;
+- indicateur `requires_attention`.
 
-HA Doctor n'accède jamais directement à `.storage`.
+Une baisse significative du score ou l'apparition d'un nouveau diagnostic `action_now` peut faire passer le scan en régression.
 
-Les registres sont obtenus via le WebSocket Home Assistant. Deux catégories sont séparées :
+## Score V4
 
-- **orphelin probable** : entrée active du registre sans aucun état correspondant ;
-- **candidat local à revoir** : automation/script/helper/template simplement `unavailable`, ce qui ne suffit pas à prouver qu'il est obsolète.
+Modèle : `root_cause_temporal_v4`.
 
-Aucune suppression automatique n'est proposée ou effectuée.
+Le score est calculé sur le plan corrélé final, et non sur les volumes bruts d'états.
 
-## Rapport JSON 0.5
+La pénalité dépend de :
 
-Les principaux blocs orientés utilisateur sont :
+- priorité ;
+- sévérité ;
+- confiance ;
+- persistance ;
+- impact de dépendance.
 
-- `scores`
-- `diagnostic_summary`
-- `entity_health`
-- `registry_analysis`
-- `diagnostic_engine`
-- `executive_summary`
-- `action_plan`
-- `diagnostic_explanations`
-- `registry_observations`
-- `findings`
-- `diagnostics`
+Des plafonds de pénalité par domaine évitent qu'une seule cause produisant de nombreux symptômes ne soit comptée plusieurs fois.
 
-## Score Alpha
+Le rapport expose le détail dans `score_meta.penalty_breakdown` et `score_meta.domain_penalties`.
 
-La 0.5 utilise `priority_v3-explain-preview`.
+Le score reste un indicateur Alpha et non une certification.
 
-Les nouveaux diagnostics du registre et le moteur explicatif **ne modifient pas encore le score** :
+## Dette de maintenance
 
-- `registry_scoring: false`
-- `explanatory_scoring: false`
+`maintenance_debt` est volontairement séparé de `scores`.
 
-Cette décision permet de comparer les rapports 0.4.x et 0.5.0 pendant la calibration sur plusieurs installations.
+Il agrège notamment :
 
-Le score reste un indice d'aide à la décision, pas une certification de sécurité ou de conformité.
+- références absentes ;
+- orphelins probables ;
+- candidats locaux à revoir ;
+- traces de secrets dans archives ;
+- couverture partielle des automatisations YAML.
 
-## Analyse des blueprints
+Le but est de montrer qu'une installation peut fonctionner correctement tout en accumulant une dette de configuration.
 
-HA Doctor charge les blueprints présents dans `blueprints/automation`, applique les valeurs fournies via `use_blueprint.input` et résout les références `!input`. Les valeurs par défaut présentes dans un blueprint non utilisé ne sont pas considérées comme des références actives.
+## Quality gates
 
-## Limitations Alpha 0.5
+Avant présentation du rapport, HA Doctor produit des contrôles sur ses propres entrées :
 
-- Certaines références entièrement dynamiques en Jinja ne peuvent pas être résolues statiquement.
-- Les conflits entre automatisations restent prudents lorsque l'exclusivité dépend de templates complexes.
-- Les causes racines sont des diagnostics heuristiques avec niveau de confiance, pas des preuves absolues.
-- HA Doctor ne consulte pas encore l'historique longue durée pour prouver qu'une indisponibilité persiste depuis plusieurs jours.
-- Les logs ne sont pas encore corrélés automatiquement avec chaque incident.
-- Zigbee2MQTT/MQTT sont encore analysés principalement via les entités et registres, sans diagnostic profond du maillage ou des topics.
-- Toute modification de Home Assistant doit être validée humainement avant application.
+- API ;
+- parsing YAML ;
+- résolution des blueprints ;
+- disponibilité des registres ;
+- confidentialité ;
+- nettoyage du graphe ;
+- cohérence des compteurs plan/résumé.
+
+Un échec de quality gate doit être visible afin d'éviter de donner une confiance excessive à un rapport incomplet.
+
+## Plan d'action V2
+
+`action_plan` est construit après :
+
+1. tri par priorité / sévérité / confiance ;
+2. déduplication ;
+3. suppression du bruit expliqué par des causes racines ;
+4. contexte temporel ;
+5. blast radius.
+
+Chaque action expose un champ `why_now` expliquant pourquoi elle se trouve à cette position.
+
+Le bloc `diagnostic_summary` est ensuite reconstruit à partir de ce plan final afin d'empêcher une divergence entre les compteurs affichés et les actions réellement proposées.
+
+## API 0.7
+
+- `/api/status` : état du scanner ;
+- `/api/version` : version et schéma ;
+- `/api/report` : rapport complet ;
+- `/api/summary` : rapport compact non anonymisé ;
+- `/api/insights` : synthèse produit ;
+- `/api/actions` : plan d'action ;
+- `/api/architecture` : architecture et métadonnées du graphe ;
+- `/api/quality` : quality gates, maintenance et privacy ;
+- `/api/history` : historique agrégé ;
+- `/api/diagnostic?id=...` : détail d'un diagnostic ;
+- `/api/download*` : exports ;
+- `/health` : healthcheck HTTP.
+
+## Schéma du rapport
+
+Version : `ha-doctor-report/0.7`.
+
+Nouveaux blocs importants :
+
+- `dependency_graph_meta`
+- `architecture_analysis`
+- `regression_analysis`
+- `maintenance_debt`
+- `quality_gates`
+- `recommendation_queue`
+- `report_schema`
+
+Les blocs 0.5/0.6 restent conservés autant que possible pour faciliter la compatibilité.
+
+## Robustesse de l'App
+
+Le Dockerfile 0.7 utilise `COPY *.py ./` afin qu'un nouveau module Python ne soit plus oublié dans l'image Home Assistant.
+
+La CI réalise une construction réelle de l'image puis vérifie :
+
+- présence des modules 0.7 ;
+- imports de l'application dans le conteneur ;
+- cohérence de version ;
+- présence des assets Web ;
+- tests unitaires ;
+- compilation Python.
+
+Cette vérification cible explicitement les régressions de packaging et de démarrage.
+
+## Interface
+
+Six vues principales :
+
+1. Vue d'ensemble ;
+2. Plan d'action ;
+3. Architecture ;
+4. Intégrations & appareils ;
+5. Historique ;
+6. Qualité & confidentialité.
+
+Le plan d'action peut être filtré par texte, priorité, domaine et confiance.
+
+## Limites Alpha 0.7
+
+- Jinja totalement dynamique reste difficile à analyser statiquement ;
+- le graphe représente la configuration connue, pas toutes les branches d'exécution possibles ;
+- l'exclusivité entre automatisations dépendant de templates complexes peut nécessiter une lecture humaine ;
+- les logs Home Assistant ne sont pas encore corrélés automatiquement à chaque diagnostic ;
+- le maillage Zigbee/MQTT n'est pas encore diagnostiqué en profondeur ;
+- les causes racines restent probabilistes ;
+- aucune réparation automatique n'est exécutée.
