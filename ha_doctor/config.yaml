@@ -1,7 +1,7 @@
 name: "HA Doctor"
-version: "0.8.5"
+version: "0.8.6"
 slug: "ha_doctor"
-description: "Contrôle technique local, corrélé, temporel, sémantique, branch-aware et par lineage de votre installation Home Assistant"
+description: "Contrôle technique local, corrélé, temporel, sémantique et partageable de votre installation Home Assistant"
 arch:
   - amd64
   - aarch64
