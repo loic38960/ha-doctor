@@ -2,218 +2,151 @@
 
 **Le contrôle technique de votre Home Assistant.**
 
-HA Doctor est un prototype de diagnostic **local, explicatif et en lecture seule** pour Home Assistant OS. Il analyse l'installation, corrèle les symptômes, étudie les dépendances entre automatisations et produit un plan d'action sans appliquer de modification automatique.
+HA Doctor est une App Home Assistant de diagnostic **locale, explicative et en lecture seule**. Elle inspecte l'état de l'installation et les YAML autorisés, corrèle les symptômes, comprend les dépendances entre automatisations et transforme le résultat en plan d'action priorisé.
 
-## Alpha 0.8 — Entity Flow V3
+## Milestone 0.9 — du diagnostic technique au triage client
 
-La 0.8 approfondit surtout une faiblesse des versions précédentes : comprendre ce qu'une automatisation **fait réellement**, même lorsqu'elle utilise des blueprints, des variables ou des cibles Jinja.
+La 0.9 ne se contente plus d'empiler des alertes. Elle répond d'abord à cinq questions simples :
 
-Le moteur cherche désormais à répondre à six questions :
+1. **Quel est l'état global de mon Home Assistant ?**
+2. **Qu'est-ce que je dois corriger en premier ?**
+3. **Quel problème a le plus d'impact réel ?**
+4. **À quel point HA Doctor est-il sûr de son propre diagnostic ?**
+5. **Qu'est-ce qui a réellement changé depuis les scans précédents ?**
 
-1. **Quel est le vrai problème ?**
-2. **Quelle cause commune explique les symptômes ?**
-3. **Quelles automatisations sont réellement exposées ?**
-4. **Quels équipements sont effectivement commandés ?**
-5. **Quelles cibles dynamiques HA Doctor sait-il prouver ou seulement supposer ?**
-6. **La situation s'améliore-t-elle ou se dégrade-t-elle dans le temps ?**
+Le moteur technique 0.8 reste présent en dessous : Entity Flow, Controller Semantics, lineage, blast radius, temporalité, résilience et Score V5 Preview. La 0.9 ajoute une couche produit qui rend ces informations directement exploitables.
 
-### Entity Flow V3
+### Doctor View V1
 
-Le graphe `entity_flow_v3` distingue maintenant :
+`doctor_view` produit un verdict court et déterministe :
 
-- `triggers` — entités qui déclenchent une automatisation ;
+- score technique V4 inchangé ;
+- preview V5 séparé ;
+- projection après les premières corrections ;
+- prochaine meilleure action ;
+- nombre d'actions à corriger, investiguer, revoir ou optimiser ;
+- confiance du diagnostic ;
+- résumé des changements depuis l'historique.
+
+Aucun score historique n'est réécrit par cette couche.
+
+### Triage Board V1
+
+Chaque élément du plan reçoit une vue client commune :
+
+- `lane` : `fix_now`, `investigate`, `review`, `optimize` ou `watch` ;
+- `risk_score` de 0 à 100 ;
+- niveau de confiance A/B/C/D ;
+- type de traitement ;
+- effort estimé ;
+- blast radius ;
+- gain de score estimé lorsqu'un scénario Score V5 existe.
+
+Le tri est calculé localement à partir du rapport déjà produit. Il ne lance aucune nouvelle requête Home Assistant.
+
+### Diagnostic Trust V1
+
+HA Doctor expose maintenant la confiance qu'il accorde à **son propre scan**. Elle tient notamment compte de :
+
+- quality gates ;
+- cohérence interne ;
+- résolution des flux ;
+- erreurs de lineage ;
+- cibles dynamiques non résolues ;
+- garanties de confidentialité et de lecture seule.
+
+Une installation peut donc avoir un bon score tout en ayant un scan incomplet, et cette différence reste visible.
+
+### Report Self-Check V1
+
+Avant présentation, HA Doctor contrôle son propre rapport :
+
+- identité version/schéma ;
+- bornes des scores ;
+- compteurs de sévérité ;
+- unicité des findings et actions ;
+- cohérence du plan d'action ;
+- cohérence contrôleurs/paires ;
+- cohérence de la résilience ;
+- métriques de flux et temporalité ;
+- invariants de confidentialité ;
+- sérialisation JSON et taille du rapport.
+
+L'auto-contrôle est lui-même exposé dans le rapport et via `/api/self-check`.
+
+## Intelligence technique conservée
+
+### Entity Flow V3.1
+
+Le graphe distingue :
+
+- `triggers_on` — entités qui déclenchent une automatisation ;
 - `controls` — entités réellement commandées ;
 - `calls` — scripts, scènes ou automatisations invoqués ;
-- `reads` — entités simplement consultées ;
-- `dynamic_controls` — cibles dynamiques résolues avec un niveau de confiance ;
-- `unresolved_dynamic_targets` — cibles que l'analyse statique ne peut pas démontrer.
+- `reads` — entités consultées ;
+- cibles dynamiques résolues et leur confiance.
 
-HA Doctor tente notamment de résoudre :
+HA Doctor n'exécute pas les templates Jinja. La résolution reste statique et prudente.
 
-```yaml
-variables:
-  pompe_entity: switch.pompe_piscine
+### Controller Semantics V6
 
-action:
-  - action: switch.turn_on
-    target:
-      entity_id: "{{ pompe_entity }}"
-```
+Le moteur sait notamment reconnaître :
 
-ainsi que les chaînes de variables et les ensembles de cibles possibles, par exemple une variable pouvant désigner plusieurs `climate.*`.
+- conditions d'état mutuellement exclusives ;
+- ensembles de modes littéraux exclusifs ;
+- commandes déterministes identiques ;
+- réconciliations au démarrage ;
+- handoffs par helper ;
+- interlocks correctifs ;
+- interlocks médiés par une troisième automatisation.
 
-HA Doctor **n'exécute jamais les templates Jinja** pour cette analyse. Il utilise uniquement une résolution statique prudente.
+Une paire n'est déclassée que lorsqu'une preuve statique suffisante existe.
 
-### Confiance des cibles dynamiques
+### Resilience V4
 
-Une cible peut être classée selon la preuve disponible :
+La résilience distingue désormais :
 
-- cible statique explicite ;
-- lignée de variable déterministe ;
-- plusieurs cibles possibles ;
-- inférence prudente par domaine ;
-- non résolue.
+- contrôle physique ;
+- contrôle de helper ;
+- usage observationnel ;
+- dépendance externe ;
+- dépendance de configuration locale.
 
-Une cible non démontrable n'est pas inventée. Le quality gate de flux indique le taux de résolution réel du scan.
+Les triggers `numeric_state` fail-closed et les branches explicites de repli peuvent être reconnus. Une simple lecture destinée à une notification ne gonfle plus artificiellement le risque physique.
 
-### Appels de scripts séparés des commandes
+### Entity Lineage + Registry Blast Radius
 
-Un appel à :
+HA Doctor peut suivre une source vers des entités dérivées puis vers les automatisations utilisatrices. Une panne d'intégration peut donc être reliée à son impact réel même lorsque l'automatisation lit un capteur template intermédiaire.
 
-```yaml
-script.notifier_mogo_loic
-```
+### Temporal V3.1
 
-n'est plus traité comme une lecture ou un actionneur physique.
+L'historique local distingue :
 
-Le graphe possède un type d'arête `calls`, ce qui permet d'identifier :
+- nouveau ;
+- persistant ;
+- récurrent ;
+- réellement résolu ;
+- toujours détecté mais déclassé.
 
-- scripts de notification partagés ;
-- scènes communes ;
-- automatisations invoquées par d'autres automatisations ;
-- hubs d'appel.
+Les rescans rapprochés ne suffisent pas à transformer artificiellement un diagnostic en problème persistant.
 
-### Architecture V2
+## Exports 0.9
 
-Le bloc `architecture_analysis` utilise maintenant le graphe V3 et expose :
+### Rapport support V3
 
-- score de complexité ;
-- hotspots d'entités ;
-- actionneurs partagés ;
-- helper hubs ;
-- trigger hubs ;
-- call hubs ;
-- dépendances critiques ;
-- boucles trigger → commande ;
-- automatisations à risque architectural élevé ;
-- cibles dynamiques non résolues.
+`/api/download-share` produit `ha-doctor-support.json` :
 
-Le score de complexité reste informatif : une installation complexe n'est pas automatiquement considérée en mauvaise santé.
+- cible ~28 Ko ;
+- plafond dur 32 Ko ;
+- toutes les identités d'actions et de findings sont conservées ;
+- le graphe complet, les états bruts, le YAML brut et les secrets sont exclus ;
+- Doctor View et Self-Check sont inclus.
 
-### Risk Index V2
+### Résumé lisible
 
-Le calcul du risque architectural des automatisations a été recalibré.
+`/api/download-support-summary` produit `ha-doctor-summary.md`, un document court avec verdict, score, prochaines actions, évolution et auto-contrôle.
 
-Les commandes vers des équipements physiques ont maintenant beaucoup plus de poids que les simples lectures. Les domaines de sécurité comme `alarm_control_panel`, `lock` et `siren` reçoivent une pondération renforcée.
-
-À l'inverse, le nombre de lectures est **logarithmique et plafonné** : une automatisation qui inspecte 50 capteurs ne devient plus artificiellement plus dangereuse qu'une automatisation qui pilote plusieurs actionneurs.
-
-### Blast Radius V2
-
-Chaque diagnostic peut maintenant exploiter :
-
-- dépendances de trigger ;
-- dépendances de commande ;
-- appels de scripts/scènes ;
-- lectures ;
-- commandes dynamiques possibles ;
-- niveau de confiance de la résolution ;
-- automatisations impactées ;
-- automatisations à risque élevé.
-
-Les helpers partagés restent fortement décotés afin d'éviter un faux blast radius massif.
-
-### Couverture des automatisations V2
-
-La 0.8 ne divise plus naïvement :
-
-`automatisations YAML / toutes les entités automation du registre`.
-
-La couverture compare maintenant les automatisations analysées aux automatisations **runtime actuellement disponibles**.
-
-Les anciennes entrées `automation.*` en état `unavailable` sont suivies séparément comme dette de maintenance potentielle et ne créent plus automatiquement un faux trou de couverture.
-
-Le rapport expose notamment :
-
-- automatisations YAML analysées ;
-- automatisations runtime totales ;
-- automatisations runtime disponibles ;
-- automatisations `unavailable` ;
-- couverture réelle ;
-- écart de couverture ;
-- candidats d'anciennes entrées registry.
-
-### Dette de maintenance V2
-
-`maintenance_debt_v2` est séparée de l'indice de santé.
-
-Elle distingue :
-
-- références YAML absentes ;
-- orphelins réellement probables ;
-- simples candidats registry à revoir ;
-- archives contenant potentiellement des secrets ;
-- vrai écart de couverture ;
-- doublons d'automatisations ;
-- actions identiques consécutives ;
-- attentes longues.
-
-Les signaux faibles ne sont plus pénalisés comme des erreurs confirmées et une protection limite le double comptage d'un même problème.
-
-### Score V4 conservé
-
-La 0.8 conserve volontairement l'échelle `Score V4` introduite en 0.7 afin que l'historique reste comparable pendant la migration du graphe.
-
-Le score tient toujours compte de :
-
-- priorité ;
-- sévérité ;
-- confiance ;
-- persistance ;
-- causes racines ;
-- impact des dépendances ;
-- plafonds de pénalité par domaine.
-
-Les volumes bruts `unavailable` et `unknown` restent informatifs et ne pénalisent pas directement le score lorsqu'une cause racine les explique.
-
-### Historique et régressions
-
-HA Doctor conserve jusqu'à 20 snapshots agrégés dans `/data/ha-doctor-history.json`.
-
-Sont conservés uniquement :
-
-- dates ;
-- scores ;
-- compteurs ;
-- identifiants de diagnostics ;
-- quelques métriques agrégées d'architecture ;
-- taux agrégés de résolution des flux ;
-- taux de couverture.
-
-Aucun état brut, YAML brut ou texte de template dynamique n'est persisté.
-
-### Quality Gates V2
-
-HA Doctor contrôle aussi la qualité de son propre diagnostic :
-
-- API Home Assistant ;
-- parsing YAML ;
-- résolution des blueprints ;
-- registres Home Assistant ;
-- confidentialité ;
-- cohérence du rapport ;
-- **résolution des flux d'entités** ;
-- **couverture réelle des automatisations** ;
-- **historique temporel**.
-
-Le gate de flux tient compte du taux de cibles comprises, du taux de résolution des cibles dynamiques et des éventuelles erreurs de relecture sémantique.
-
-## Interface
-
-L'interface Ingress conserve les six vues principales :
-
-1. **Vue d'ensemble** — Score V4, verdict, évolution et priorités ;
-2. **Plan d'action** — diagnostics corrélés et filtres ;
-3. **Architecture** — hotspots, actionneurs partagés et automatisations complexes ;
-4. **Intégrations & appareils** — causes racines et périphériques touchés ;
-5. **Historique** — évolution et persistance ;
-6. **Qualité & confidentialité** — quality gates et dette de maintenance.
-
-Les API 0.8 exposent en plus les nouvelles métriques de flux et de couverture.
-
-## API locale
-
-Principaux endpoints Ingress :
+## API locale principale
 
 - `/api/status`
 - `/api/version`
@@ -226,66 +159,60 @@ Principaux endpoints Ingress :
 - `/api/flow`
 - `/api/coverage`
 - `/api/history`
+- `/api/control-intelligence`
+- `/api/doctor-view`
+- `/api/self-check`
+- `/api/share-report`
 - `/api/diagnostic?id=DX-...`
-- `/api/download`
-- `/api/download-summary`
+- `/api/download-share`
+- `/api/download-support-summary`
 - `/api/download-anonymized`
 - `/health`
 
 ## Confidentialité et sécurité
 
-HA Doctor n'effectue que des lectures dans son fonctionnement actuel.
+HA Doctor n'effectue que des lectures.
 
 - `/ha_config` est monté en lecture seule ;
 - `secrets.yaml` n'est pas lu ;
 - `.storage` n'est pas parcouru directement ;
-- les registres sont interrogés via l'API WebSocket Home Assistant ;
+- les registres passent par l'API WebSocket Home Assistant ;
 - bases de données, clés privées, certificats et sauvegardes binaires sont exclus ;
 - les valeurs brutes des états ne sont pas persistées ;
-- le token Supervisor et les payloads bruts du registre ne sont pas enregistrés ;
-- le YAML reparsé par Entity Flow V3 n'est pas persisté ;
-- le texte brut des cibles Jinja n'est pas enregistré dans le rapport ;
-- les payloads d'appels de scripts ne sont pas persistés ;
+- le token Supervisor n'est pas enregistré ;
+- le YAML reparsé et le texte brut des templates ne sont pas persistés dans l'historique ;
 - aucune correction, suppression, désactivation ou redémarrage n'est exécuté automatiquement ;
-- le moteur fonctionne localement sans IA externe.
+- aucun service d'IA externe n'est utilisé pour le diagnostic.
 
-L'export anonymisé retire les identifiants locaux et conserve uniquement les métriques nécessaires au partage d'un diagnostic.
-
-## Installation via dépôt personnalisé
+## Installation
 
 Dans Home Assistant :
 
-1. Ouvrir **Paramètres → Apps → App Store**.
-2. Ouvrir **⋮ → Dépôts**.
-3. Ajouter `https://github.com/loic38960/ha-doctor` si nécessaire.
-4. Rechercher les mises à jour de l'App Store.
+1. **Paramètres → Apps → App Store**.
+2. **⋮ → Dépôts**.
+3. Ajouter `https://github.com/loic38960/ha-doctor`.
+4. Rechercher les mises à jour.
 5. Installer ou mettre à jour **HA Doctor**.
-6. Démarrer l'App et ouvrir son interface Web.
+6. Démarrer l'App et ouvrir l'interface Web.
 
-## Robustesse du packaging
-
-Le Dockerfile copie automatiquement tous les modules Python du répertoire App avec `COPY *.py ./`.
+## Validation et packaging
 
 La CI exécute à chaque push :
 
-- tous les tests unitaires ;
+- tous les tests unitaires historiques et 0.9 ;
 - compilation de tous les modules Python ;
-- validation des marqueurs UI ;
-- validation de la cohérence des versions 0.8 ;
+- validation JavaScript de l'empilement UI ;
+- cohérence de version ;
 - construction réelle de l'image Home Assistant App ;
-- vérification de la présence des modules packagés ;
-- import de `app_v080`, `scanner_v080`, `intelligence_v080`, `flow_v080` et des dépendances dans le conteneur construit ;
-- vérification des assets Web.
+- vérification des modules packagés ;
+- smoke tests du runtime HTTP ;
+- tests des exports JSON/Markdown ;
+- tests de non-régression Controller Semantics V6 et Resilience V4.
 
-Cette chaîne vise à détecter avant installation aussi bien les régressions logiques que les erreurs de packaging du type `ModuleNotFoundError`.
+Le Dockerfile conserve `COPY *.py ./`, afin qu'un nouveau moteur Python ne soit pas oublié dans l'image.
 
-## Limites Alpha
+## Politique de versions
 
-- certains templates Jinja réellement calculés à l'exécution resteront non résolubles statiquement ;
-- une cible dynamique avec plusieurs possibilités est volontairement présentée comme possible, pas certaine ;
-- les conflits complexes entre automatisations nécessitent parfois une validation humaine ;
-- les causes racines restent des diagnostics probabilistes avec niveau de confiance ;
-- le maillage Zigbee, les statistiques Recorder et les logs détaillés peuvent encore être approfondis ;
-- aucune correction automatique n'est effectuée.
+À partir de 0.9, les versions visibles sont traitées comme des **milestones**. Les évolutions internes sont regroupées autant que possible afin d'éviter une succession de micro-versions pour quelques règles isolées.
 
-Le score HA Doctor est un indicateur de diagnostic et de maintenance, pas une certification de sécurité ou de conformité.
+HA Doctor reste expérimental : son score est un indicateur de diagnostic et de maintenance, pas une certification de sécurité ou de conformité.
