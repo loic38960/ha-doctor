@@ -1,12 +1,13 @@
 """HA Doctor 0.9 milestone scanner.
 
 0.9 keeps the validated 0.8.8 acquisition/semantic pipeline and adds only pure
-post-processing: product triage and report self-check. No second Home Assistant
-state request is performed.
+post-processing: product triage, report self-check and publication readiness.
+No second Home Assistant state request is performed.
 """
 import time
 
 import scanner_v088 as base
+from finalize_v090 import finalize_release
 from product_v090 import apply_product_intelligence
 from selfcheck_v090 import run_self_check
 
@@ -19,6 +20,7 @@ def scan(include_yaml=True):
     report = base.scan(include_yaml=include_yaml)
     apply_product_intelligence(report)
     run_self_check(report)
+    finalize_release(report)
     report["version"] = VERSION
     report.setdefault("report_schema", {})["version"] = REPORT_SCHEMA
     report.setdefault("privacy", {}).update({
