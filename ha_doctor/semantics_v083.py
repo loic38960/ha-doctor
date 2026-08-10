@@ -22,7 +22,7 @@ def _strings(value):
             yield from _strings(item)
 
 
-_ENTITY_LITERAL_RE = re.compile(r"\\b[a-z_][a-z0-9_]*\\.[A-Za-z0-9_]+\\b")
+_ENTITY_LITERAL_RE = re.compile(r"\b[a-z_][a-z0-9_]*\.[A-Za-z0-9_]+\b")
 
 
 def _literal_entity_ids(effective):
