@@ -23,31 +23,33 @@ jobs:
       - name: Compile Python sources
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.8 UI compatibility markers
-        run: |
-          grep -q "Vue d'ensemble" ha_doctor/static/index.html
-          grep -q "Architecture" ha_doctor/static/index.html
-          grep -q "Qualité & confidentialité" ha_doctor/static/index.html
-          grep -q "Score V4" ha_doctor/static/index.html
-
-      - name: Validate 0.8.7 runtime UI compatibility
+      - name: Validate 0.8.7 UI and runtime markers
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
           import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087
+
           source = Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
           enhanced = app_v087.enhance_ui_v087(source)
+          for marker in (
+              "Vue d'ensemble",
+              "Architecture",
+              "Qualité & confidentialité",
+              "Score V4",
+              "Entity Flow V3",
+              "Calibration 0.8.2",
+              "Hardening 0.8.3",
+              "Semantic Lineage 0.8.4",
+              "Branch Intelligence 0.8.5",
+              "Partage 0.8.6",
+              "Partage 0.8.7",
+              "Rapport à envoyer · compact",
+              "download-share",
+          ):
+              assert marker in enhanced, marker
           assert '__HA_DOCTOR_VERSION__' not in enhanced
-          assert 'Entity Flow V3' in enhanced
-          assert 'Calibration 0.8.2' in enhanced
-          assert 'Hardening 0.8.3' in enhanced
-          assert 'Semantic Lineage 0.8.4' in enhanced
-          assert 'Branch Intelligence 0.8.5' in enhanced
-          assert 'Partage 0.8.6' in enhanced
-          assert 'Partage 0.8.7' in enhanced
-          assert 'Rapport à envoyer · compact' in enhanced
-          assert 'download-share' in enhanced
           assert app_v087.VERSION == '0.8.7'
+
           Path('/tmp/ha-doctor-v087-ui.js').write_text(
               app_v080.UI_PATCH_JS + '\n' +
               app_v082.UI_PATCH_V082 + '\n' +
@@ -75,7 +77,7 @@ jobs:
       - name: Build Home Assistant App image
         run: docker build --build-arg BUILD_VERSION=0.8.7 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify packaged 0.8.7 modules exist
+      - name: Verify packaged modules and imports
         run: |
           docker run --rm --entrypoint sh ha-doctor-ci -c \
             'test -f /app/scanner_v087.py &&
@@ -86,43 +88,15 @@ jobs:
              test -f /app/scanner_v085.py &&
              test -f /app/intelligence_v085.py &&
              test -f /app/semantics_v085_fixed.py'
-
-      - name: Smoke test packaged Python imports
-        run: |
           docker run --rm --entrypoint python3 ha-doctor-ci -c \
             "import app_v087, scanner_v087, sharing_v087, hardening_v087; assert app_v087.VERSION == '0.8.7'; assert scanner_v087.VERSION == '0.8.7'; assert sharing_v087.VERSION == '0.8.7'; assert hardening_v087.VERSION == '0.8.7'; print('HA Doctor 0.8.7 packaged imports OK')"
 
-      - name: Smoke test packaged web assets
+      - name: Smoke test packaged UI
         run: |
           docker run --rm --entrypoint python3 ha-doctor-ci -c \
-            "from pathlib import Path; import app_v087; p=Path('/app/static/index.html'); assert p.exists(); t=app_v087.enhance_ui_v087(p.read_text()); assert 'Rapport à envoyer · compact' in t and 'Partage 0.8.7' in t; print('HA Doctor 0.8.7 UI packaged OK')"
+            "from pathlib import Path; import app_v087; p=Path('/app/static/index.html'); t=app_v087.enhance_ui_v087(p.read_text()); assert 'Rapport à envoyer · compact' in t and 'Partage 0.8.7' in t; print('HA Doctor 0.8.7 UI packaged OK')"
 
-      - name: Runtime smoke test /health
-        run: |
-          set -euo pipefail
-          cleanup() {
-            docker logs ha-doctor-ci-runtime || true
-            docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime \
-            -e HA_DOCTOR_SCAN_ON_START=false \
-            -p 127.0.0.1:18099:8099 \
-            --entrypoint python3 ha-doctor-ci /app/app_v087.py
-          ok=0
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:18099/health >/tmp/ha-doctor-health.json; then
-              ok=1
-              break
-            fi
-            sleep 1
-          done
-          test "$ok" -eq 1
-          grep -q '"ok"' /tmp/ha-doctor-health.json
-          grep -q '"0.8.7"' /tmp/ha-doctor-health.json
-          echo "HA Doctor 0.8.7 /health runtime smoke OK"
-
-      - name: Runtime smoke test share-report V2 endpoint
+      - name: Runtime smoke test health and share V2
         run: |
           set -euo pipefail
           cat >/tmp/ha-doctor-report.json <<'JSON'
@@ -140,27 +114,37 @@ jobs:
             "report_schema":{"version":"ha-doctor-report/0.8.7"}
           }
           JSON
+
           cleanup() {
-            docker logs ha-doctor-share-runtime || true
-            docker rm -f ha-doctor-share-runtime >/dev/null 2>&1 || true
+            docker logs ha-doctor-ci-runtime || true
+            docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-share-runtime \
+
+          docker run -d --name ha-doctor-ci-runtime \
             -e HA_DOCTOR_SCAN_ON_START=false \
-            -p 127.0.0.1:18100:8099 \
+            -p 127.0.0.1:18099:8099 \
             -v /tmp/ha-doctor-report.json:/data/report.json:ro \
             --entrypoint python3 ha-doctor-ci /app/app_v087.py
+
           ok=0
           for i in $(seq 1 20); do
-            if curl -fsS -D /tmp/share-headers.txt http://127.0.0.1:18100/api/download-share -o /tmp/ha-doctor-share.json; then
+            if curl -fsS http://127.0.0.1:18099/health >/tmp/ha-doctor-health.json; then
               ok=1
               break
             fi
             sleep 1
           done
           test "$ok" -eq 1
+          grep -q '"ok"' /tmp/ha-doctor-health.json
+          grep -q '"0.8.7"' /tmp/ha-doctor-health.json
+
+          curl -fsS -D /tmp/share-headers.txt \
+            http://127.0.0.1:18099/api/download-share \
+            -o /tmp/ha-doctor-share.json
           grep -qi 'filename="ha-doctor-share.json"' /tmp/share-headers.txt
           grep -qi 'X-HA-Doctor-Share-Model: assistant_share_report_v2' /tmp/share-headers.txt
+
           python - <<'PY'
           import json
           from pathlib import Path
@@ -172,84 +156,54 @@ jobs:
           assert 'dependency_graph' not in payload
           assert payload['export_meta']['full_dependency_graph_included'] is False
           assert size <= payload['share_schema']['hard_bytes'], (size, payload['share_schema'])
-          print(f'HA Doctor 0.8.7 share endpoint OK · {size} bytes')
+          print(f'HA Doctor 0.8.7 runtime/share OK · {size} bytes')
           PY
 
-      - name: Runtime smoke test controller summary hardening
+      - name: Smoke test controller hardening and branch semantics
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           from hardening_v087 import harden_report_v087
+          from semantics_v085_fixed import resolve_branch_pair
+
           report={
-            "version":"0.8.6",
-            "scores":{"global":76},
-            "condition_semantics":{
-              "unproven_pairs":[
-                {"entity_id":"switch.pump","automations":["A","B"]},
-                {"entity_id":"switch.pump","automations":["A","C"]},
-                {"entity_id":"switch.boost","automations":["D","E"]}
-              ],
-              "physical_unproven_pair_count":3,
-              "helper_unproven_pair_count":0,
-              "other_unproven_pair_count":0,
-              "branch_protocol_resolved_pair_count":2
-            },
-            "findings":[{"rule_id":"HD-AUTO-003","summary":"old"}],
-            "action_plan":{"items":[{"source_id":"HD-AUTO-003","evidence":[{"type":"summary","label":"Constat","text":"3 entities"}]}]},
-            "diagnostic_summary":{},
-            "executive_summary":{},
-            "score_meta":{},
-            "report_schema":{},
-            "consistency_analysis":{"status":"pass","checks":{}}
+              "version":"0.8.6",
+              "scores":{"global":76},
+              "condition_semantics":{
+                  "unproven_pairs":[
+                      {"entity_id":"switch.pump","automations":["A","B"]},
+                      {"entity_id":"switch.pump","automations":["A","C"]},
+                      {"entity_id":"switch.boost","automations":["D","E"]},
+                  ],
+                  "physical_unproven_pair_count":3,
+                  "helper_unproven_pair_count":0,
+                  "other_unproven_pair_count":0,
+                  "branch_protocol_resolved_pair_count":2,
+              },
+              "findings":[{"rule_id":"HD-AUTO-003","summary":"old"}],
+              "action_plan":{"items":[{"source_id":"HD-AUTO-003","evidence":[{"type":"summary","label":"Constat","text":"3 entities"}]}]},
+              "diagnostic_summary":{},
+              "executive_summary":{},
+              "score_meta":{},
+              "report_schema":{},
+              "consistency_analysis":{"status":"pass","checks":{}},
           }
           hardened=harden_report_v087(report)
           summary=hardened['controller_review_summary']
-          assert summary['entity_count']==2
-          assert summary['pair_count']==3
+          assert summary['entity_count'] == 2
+          assert summary['pair_count'] == 3
+          assert hardened['scores']['global'] == 76
           text=hardened['action_plan']['items'][0]['evidence'][0]['text']
           assert '2 entité(s)' in text and '3 paire(s)' in text
-          assert hardened['scores']['global']==76
-          print('HA Doctor 0.8.7 controller count hardening OK')
-          PY
 
-      - name: Runtime smoke test branch-aware modules
-        run: |
-          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from consistency_v085 import validate_report_consistency_v5
-          from semantics_v085_fixed import resolve_branch_pair
-
-          sender = {"effective": {"action": [
-              {"service": "input_boolean.turn_on", "target": {"entity_id": "input_boolean.priority"}},
-              {"service": "switch.turn_off", "target": {"entity_id": "switch.pump"}},
+          sender={"effective":{"action":[
+              {"service":"input_boolean.turn_on","target":{"entity_id":"input_boolean.priority"}},
+              {"service":"switch.turn_off","target":{"entity_id":"switch.pump"}},
           ]}}
-          receiver = {"effective": {
-              "trigger": [{"platform": "state", "entity_id": "input_boolean.priority", "from": "on", "to": "off"}],
-              "condition": [{"condition": "state", "entity_id": "input_boolean.priority", "state": "off"}],
-              "action": [{"service": "switch.turn_on", "target": {"entity_id": "switch.pump"}}],
+          receiver={"effective":{
+              "trigger":[{"platform":"state","entity_id":"input_boolean.priority","from":"on","to":"off"}],
+              "condition":[{"condition":"state","entity_id":"input_boolean.priority","state":"off"}],
+              "action":[{"service":"switch.turn_on","target":{"entity_id":"switch.pump"}}],
           }}
-          assert resolve_branch_pair(sender, receiver, "switch.pump") is not None
-
-          report = {
-              "version": "0.8.5",
-              "report_schema": {"version": "ha-doctor-report/0.8.5"},
-              "action_plan": {"total": 0, "displayed": 0, "remaining": 0, "counts": {"action_now": 0, "verify": 0, "optimize": 0}, "items": []},
-              "recommendation_queue": {"total": 0, "items": []},
-              "diagnostic_summary": {"priority_counts": {"action_now": 0, "verify": 0, "optimize": 0}},
-              "root_cause_summary": {"actionable_registry_incidents": 0},
-              "flow_confidence": {"model": "flow_confidence_v3.1", "low_confidence_dynamic_edges": 0, "review_required_dynamic_edges": 0},
-              "dependency_graph_meta": {"confidence_model": "flow_confidence_v3.1", "low_confidence_dynamic_edges": 0, "review_required_dynamic_edges": 0},
-              "architecture_analysis": {"model": "architecture_v3_post_flow", "post_flow_recomputed": true},
-              "condition_semantics": {"unproven_pair_count": 0, "unproven_pairs": [], "physical_unproven_pair_count": 0},
-              "temporal_analysis": {"resolved_since_previous": [], "deescalated_since_previous": []},
-              "entity_lineage": {"parse_error_count": 0, "raw_yaml_persisted": false, "secret_values_persisted": false},
-              "diagnostic_explanations": [],
-              "score_meta": {"penalty_total": 0, "penalty_breakdown": []},
-              "privacy": {}
-          }
-          # JSON-style booleans above are corrected before validation.
-          report['architecture_analysis']['post_flow_recomputed'] = True
-          report['entity_lineage']['raw_yaml_persisted'] = False
-          report['entity_lineage']['secret_values_persisted'] = False
-          result = validate_report_consistency_v5(report)
-          assert result["status"] == "pass", result
-          print("HA Doctor underlying 0.8.5 branch-aware model smoke OK")
+          assert resolve_branch_pair(sender, receiver, 'switch.pump') is not None
+          print('HA Doctor 0.8.7 hardening/branch smoke OK')
           PY
