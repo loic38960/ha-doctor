@@ -19,6 +19,23 @@ def _severity_rank(value):
     return {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}.get(str(value or "info"), 9)
 
 
+def _sync_report_counters(report):
+    severities = Counter(str(item.get("severity") or "info") for item in report.get("findings") or [])
+    report["severity_counts"] = {
+        key: severities.get(key, 0)
+        for key in ("critical", "high", "medium", "low", "info")
+    }
+    explanations = report.get("diagnostic_explanations") or []
+    engine = report.setdefault("diagnostic_engine", {})
+    engine["explanation_count"] = len(explanations)
+    engine["finding_explanation_count"] = sum(
+        1 for item in explanations if str(item.get("source_type") or "") == "finding"
+    )
+    engine["registry_incident_count"] = sum(
+        1 for item in explanations if str(item.get("source_type") or "").startswith("registry_")
+    )
+
+
 def _sync_sections(report):
     plan = report.setdefault("action_plan", {})
     items = plan.get("items") or []
@@ -53,11 +70,13 @@ def _sync_sections(report):
     }
     summary["actionable_count"] = counts.get("action_now", 0) + counts.get("verify", 0)
     summary["plan_id_count"] = len(items)
+    summary["source"] = "final_correlated_action_plan_v084"
     summary["headline"] = (
         f"{counts.get('action_now',0)} correction(s) prioritaire(s), "
         f"{counts.get('verify',0)} point(s) à vérifier et "
         f"{counts.get('optimize',0)} optimisation(s)."
     )
+    _sync_report_counters(report)
 
 
 def build_resilience_recommendations_v1(report):
