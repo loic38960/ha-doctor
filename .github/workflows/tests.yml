@@ -30,65 +30,66 @@ jobs:
           grep -q "Qualité & confidentialité" ha_doctor/static/index.html
           grep -q "Score V4" ha_doctor/static/index.html
 
-      - name: Validate 0.8.3 runtime UI compatibility
+      - name: Validate 0.8.4 runtime UI compatibility
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083
+          import app_v080, app_v082, app_v083, app_v084
           source = Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced = app_v083.enhance_ui_v083(source)
+          enhanced = app_v084.enhance_ui_v084(source)
           assert '__HA_DOCTOR_VERSION__' not in enhanced
           assert 'Entity Flow V3' in enhanced
           assert 'Calibration 0.8.2' in enhanced
           assert 'Hardening 0.8.3' in enhanced
-          assert 'Validation 0.8.3' in enhanced
-          assert app_v083.VERSION == '0.8.3'
-          Path('/tmp/ha-doctor-v083-ui.js').write_text(
-              app_v080.UI_PATCH_JS + '\n' + app_v082.UI_PATCH_V082 + '\n' + app_v083.UI_PATCH_V083,
+          assert 'Semantic Lineage 0.8.4' in enhanced
+          assert 'Validation 0.8.4' in enhanced
+          assert app_v084.VERSION == '0.8.4'
+          Path('/tmp/ha-doctor-v084-ui.js').write_text(
+              app_v080.UI_PATCH_JS + '\n' + app_v082.UI_PATCH_V082 + '\n' + app_v083.UI_PATCH_V083 + '\n' + app_v084.UI_PATCH_V084,
               encoding='utf-8',
           )
-          print('HA Doctor 0.8.3 runtime/UI compatibility OK')
+          print('HA Doctor 0.8.4 runtime/UI compatibility OK')
           PY
-          node --check /tmp/ha-doctor-v083-ui.js
+          node --check /tmp/ha-doctor-v084-ui.js
 
       - name: Validate version consistency
         run: |
-          grep -q 'version: "0.8.3"' ha_doctor/config.yaml
-          grep -q 'VERSION = "0.8.3"' ha_doctor/app_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/scanner_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/intelligence_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/temporal_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/impact_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/semantics_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/resilience_v083.py
-          grep -q 'VERSION = "0.8.3"' ha_doctor/consistency_v083.py
-          grep -q 'Starting HA Doctor 0.8.3' ha_doctor/run.sh
-          grep -q 'app_v083.py' ha_doctor/run.sh
+          grep -q 'version: "0.8.4"' ha_doctor/config.yaml
+          grep -q 'VERSION = "0.8.4"' ha_doctor/app_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/scanner_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/intelligence_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/temporal_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/lineage_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/semantics_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/resilience_v084.py
+          grep -q 'VERSION = "0.8.4"' ha_doctor/consistency_v084.py
+          grep -q 'Starting HA Doctor 0.8.4' ha_doctor/run.sh
+          grep -q 'app_v084.py' ha_doctor/run.sh
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.8.3 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.8.4 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify packaged 0.8.3 modules exist
+      - name: Verify packaged 0.8.4 modules exist
         run: |
           docker run --rm --entrypoint sh ha-doctor-ci -c \
-            'test -f /app/scanner_v083.py &&
-             test -f /app/intelligence_v083.py &&
-             test -f /app/temporal_v083.py &&
-             test -f /app/impact_v083.py &&
-             test -f /app/semantics_v083.py &&
-             test -f /app/resilience_v083.py &&
-             test -f /app/consistency_v083.py &&
-             test -f /app/app_v083.py'
+            'test -f /app/scanner_v084.py &&
+             test -f /app/intelligence_v084.py &&
+             test -f /app/temporal_v084.py &&
+             test -f /app/lineage_v084.py &&
+             test -f /app/semantics_v084.py &&
+             test -f /app/resilience_v084.py &&
+             test -f /app/consistency_v084.py &&
+             test -f /app/app_v084.py'
 
       - name: Smoke test packaged Python imports
         run: |
           docker run --rm --entrypoint python3 ha-doctor-ci -c \
-            "import app_v083, scanner_v083, intelligence_v083, temporal_v083, impact_v083, semantics_v083, resilience_v083, consistency_v083; assert app_v083.VERSION == '0.8.3'; assert scanner_v083.VERSION == '0.8.3'; print('HA Doctor 0.8.3 packaged imports OK')"
+            "import app_v084, scanner_v084, intelligence_v084, temporal_v084, lineage_v084, semantics_v084, resilience_v084, consistency_v084; assert app_v084.VERSION == '0.8.4'; assert scanner_v084.VERSION == '0.8.4'; print('HA Doctor 0.8.4 packaged imports OK')"
 
       - name: Smoke test packaged web assets
         run: |
           docker run --rm --entrypoint python3 ha-doctor-ci -c \
-            "from pathlib import Path; import app_v083; p=Path('/app/static/index.html'); assert p.exists(); t=app_v083.enhance_ui_v083(p.read_text()); assert 'Architecture' in t and 'Qualité & confidentialité' in t and 'Hardening 0.8.3' in t; print('HA Doctor 0.8.3 UI packaged OK')"
+            "from pathlib import Path; import app_v084; p=Path('/app/static/index.html'); assert p.exists(); t=app_v084.enhance_ui_v084(p.read_text()); assert 'Architecture' in t and 'Qualité & confidentialité' in t and 'Semantic Lineage 0.8.4' in t; print('HA Doctor 0.8.4 UI packaged OK')"
 
       - name: Runtime smoke test /health
         run: |
@@ -101,7 +102,7 @@ jobs:
           docker run -d --name ha-doctor-ci-runtime \
             -e HA_DOCTOR_SCAN_ON_START=false \
             -p 127.0.0.1:18099:8099 \
-            --entrypoint python3 ha-doctor-ci /app/app_v083.py
+            --entrypoint python3 ha-doctor-ci /app/app_v084.py
           ok=0
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:18099/health >/tmp/ha-doctor-health.json; then
@@ -112,35 +113,38 @@ jobs:
           done
           test "$ok" -eq 1
           grep -q '"ok"' /tmp/ha-doctor-health.json
-          echo "HA Doctor 0.8.3 /health runtime smoke OK"
+          echo "HA Doctor 0.8.4 /health runtime smoke OK"
 
-      - name: Runtime smoke test hardening endpoint module
+      - name: Runtime smoke test semantic-lineage modules
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           import tempfile
           from pathlib import Path
-          from temporal_v083 import apply_temporal_v3
-          from impact_v083 import _impact_for_entities
-          from consistency_v083 import validate_report_consistency_v3
+          from temporal_v084 import apply_temporal_v31
+          from consistency_v084 import validate_report_consistency_v4
+          from semantics_v084 import normalize_flow_metadata_v31
 
+          report = {
+              "version": "0.8.4",
+              "generated_at": "2026-08-10T08:30:00Z",
+              "report_schema": {"version": "ha-doctor-report/0.8.4"},
+              "diagnostic_explanations": [],
+              "action_plan": {"total": 0, "displayed": 0, "remaining": 0, "counts": {"action_now": 0, "verify": 0, "optimize": 0}, "items": []},
+              "recommendation_queue": {"total": 0, "items": []},
+              "diagnostic_summary": {"priority_counts": {"action_now": 0, "verify": 0, "optimize": 0}},
+              "root_cause_summary": {"actionable_registry_incidents": 0},
+              "score_meta": {"penalty_total": 0, "penalty_breakdown": []},
+              "temporal_analysis": {},
+              "privacy": {},
+              "flow_confidence": {"model": "flow_confidence_v3", "dynamic_confidence_bands": {"high": 0, "inferred": 0, "heuristic": 0}, "low_confidence_dynamic_edges": 0, "review_required_dynamic_edges": 0, "low_confidence_ratio": 0.0},
+              "dependency_graph_meta": {"low_confidence_dynamic_edges": 45, "review_required_dynamic_edges": 45},
+              "architecture_analysis": {"model": "architecture_v3_post_flow", "post_flow_recomputed": True},
+              "entity_lineage": {"parse_error_count": 0, "raw_yaml_persisted": False, "secret_values_persisted": False},
+          }
+          normalize_flow_metadata_v31(report)
           with tempfile.TemporaryDirectory() as tmp:
-              report = {
-                  "version": "0.8.3",
-                  "generated_at": "2026-08-10T08:30:00Z",
-                  "report_schema": {"version": "ha-doctor-report/0.8.3"},
-                  "diagnostic_explanations": [],
-                  "action_plan": {"total": 0, "displayed": 0, "remaining": 0, "counts": {"action_now": 0, "verify": 0, "optimize": 0}, "items": []},
-                  "recommendation_queue": {"total": 0, "items": []},
-                  "diagnostic_summary": {"priority_counts": {"action_now": 0, "verify": 0, "optimize": 0}},
-                  "root_cause_summary": {"actionable_registry_incidents": 0},
-                  "score_meta": {"penalty_total": 0, "penalty_breakdown": []},
-                  "temporal_analysis": {},
-                  "privacy": {},
-              }
-              apply_temporal_v3(report, history_path=Path(tmp) / "history.json")
-              result = validate_report_consistency_v3(report)
-              assert result["status"] == "pass", result
-              impact = _impact_for_entities({"dependency_graph": [], "architecture_analysis": {}}, {"sensor.x"})
-              assert impact["model"] == "registry_blast_radius_v3"
-          print("HA Doctor 0.8.3 simulated hardening smoke OK")
+              apply_temporal_v31(report, history_path=Path(tmp) / "history.json")
+          result = validate_report_consistency_v4(report)
+          assert result["status"] == "pass", result
+          print("HA Doctor 0.8.4 simulated semantic-lineage smoke OK")
           PY
