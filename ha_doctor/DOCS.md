@@ -1,291 +1,264 @@
-# HA Doctor 0.7.0 Alpha
+# HA Doctor 0.9.0 — Documentation technique
 
 ## Objectif
 
-HA Doctor effectue un diagnostic local et en lecture seule d'une installation Home Assistant. Il ne corrige, ne supprime, ne redémarre et ne modifie rien automatiquement.
+HA Doctor effectue un diagnostic local et en lecture seule d'une installation Home Assistant. La 0.9 conserve le moteur technique accumulé depuis la 0.7 et ajoute une couche de triage destinée à transformer un rapport complexe en décisions ordonnées.
 
-La 0.7 transforme le scanner en moteur de diagnostic corrélé : les règles statiques, les registres, le graphe d'automatisations et l'historique local sont combinés pour produire des causes racines, un blast radius et un plan d'action final cohérent.
+Aucune fonction 0.9 ne corrige, ne supprime, ne désactive ou ne redémarre Home Assistant.
 
-## Chaîne d'analyse
-
-La chaîne actuelle est organisée ainsi :
+## Chaîne d'analyse 0.9
 
 1. collecte Home Assistant / Supervisor ;
-2. analyse YAML, packages et blueprints ;
-3. règles statiques sur configuration et automatisations ;
-4. triage `unavailable` / `unknown` ;
-5. Entity Registry / Device Registry via WebSocket ;
-6. corrélation intégration / appareil / cluster ;
-7. moteur explicatif local ;
-8. nettoyage du graphe de dépendances ;
-9. blast radius pondéré ;
-10. contexte temporel et régressions ;
-11. score V4 ;
-12. analyse d'architecture et dette de maintenance ;
-13. synchronisation du plan, du résumé et des quality gates ;
-14. export et interface.
+2. snapshot éphémère unique des états ;
+3. analyse YAML autorisée, packages et blueprints ;
+4. règles déterministes ;
+5. santé `unavailable` / `unknown` ;
+6. Entity Registry / Device Registry par WebSocket ;
+7. corrélation intégration / appareil / cluster ;
+8. Entity Flow V3.1 ;
+9. architecture et blast radius ;
+10. Controller Semantics V6 ;
+11. Resilience V4 ;
+12. Entity Lineage + Registry Blast Radius V4 ;
+13. temporalité V3.1 ;
+14. Score V4 + Preview V5 ;
+15. Product Triage V1 ;
+16. Diagnostic Trust V1 ;
+17. Report Self-Check V1 ;
+18. exports et interface.
+
+Les étapes 15 à 17 travaillent exclusivement sur le rapport déjà construit : **0 lecture d'état Home Assistant supplémentaire**.
 
 ## Données lues
 
-- API Home Assistant : configuration générale, états courants et services/actions disponibles.
-- API Supervisor : informations accessibles au rôle configuré.
-- WebSocket Home Assistant via le proxy Supervisor : Entity Registry et Device Registry.
-- `/ha_config` : YAML autorisés, montés en lecture seule.
+- API Home Assistant : configuration générale, états courants et services nécessaires au scanner ;
+- API Supervisor : informations système accessibles au rôle configuré ;
+- WebSocket Home Assistant via Supervisor : registres d'entités et d'appareils ;
+- `/ha_config` monté en lecture seule : fichiers YAML autorisés.
 
-Les états courants sont nécessaires au calcul mais ne sont pas persistés comme historique brut.
-
-## Données explicitement exclues
+## Données exclues
 
 - `secrets.yaml` / `secrets.yml` ;
-- `.storage` en accès fichier direct ;
+- `.storage` en lecture fichier directe ;
 - bases SQLite ;
-- certificats et clés ;
+- clés et certificats ;
 - sauvegardes binaires ;
-- token Supervisor ;
-- payload brut des registres dans le rapport ;
-- valeurs de secrets détectés.
+- valeurs de secrets ;
+- token Supervisor dans le rapport ;
+- états bruts dans l'historique ;
+- YAML brut dans l'historique.
 
-## Graphe de dépendances V2
+## Doctor View V1
 
-Le graphe `entity_graph_v2` distingue quatre relations :
+Bloc : `doctor_view`.
 
-- `triggers_on` : entités qui déclenchent une automatisation ;
-- `controls` : entités commandées par l'automatisation ;
-- `reads` : entités lues sans être trigger ni cible de commande ;
-- `entities` : union des entités réelles du nœud.
+Champs principaux :
 
-Les appels de service tels que `switch.turn_on`, `input_number.set_value`, `climate.set_temperature` et `todo.get_items` sont retirés des références d'entités.
+- `verdict` ;
+- `technical_health_score` ;
+- `score_v5_preview` ;
+- `projected_after_top_3` ;
+- `next_action` ;
+- `next_best_actions` ;
+- `triage_counts` ;
+- `trust` ;
+- `noise_reduction` ;
+- `change_digest` ;
+- `projection`.
 
-Le bloc `dependency_graph_meta` expose le nombre de références avant nettoyage, services filtrés, arêtes d'entités, triggers et contrôles.
+Le verdict est une présentation produit. Il ne remplace pas le score technique.
 
-## Classification des dépendances
+## Triage Board V1
 
-Les entités sont classées afin de calibrer leur impact :
+Bloc : `triage_board`.
 
-- `actuator` : actionneur physique ou logique pilotable ;
-- `sensor` : information utilisée par la logique ;
-- `helper` : état de coordination Home Assistant ;
-- `optional` : contrôle ou paramètre secondaire ;
-- `other`.
+Le moteur normalise chaque action et calcule :
 
-Un helper partagé ne doit pas peser comme une pompe, un chauffage, une serrure ou une sirène. Le calcul de `dependency_impact` applique donc un poids fortement inférieur aux helpers.
+- lane client ;
+- risque 0–100 ;
+- confiance A/B/C/D ;
+- type de traitement ;
+- effort ;
+- gain de score connu ;
+- impact de dépendance ;
+- nombre d'automatisations impactées.
 
-Chaque diagnostic peut recevoir :
+### Lanes
 
-- `impacted_automation_count` ;
-- `critical_automation_count` ;
-- `helper_only_automation_count` ;
-- `trigger_dependency_count` ;
-- `control_dependency_count` ;
-- `weighted_impact_score` ;
-- `score_multiplier` ;
-- `top_entities`.
+- `fix_now` : correction prioritaire ;
+- `investigate` : vérification à impact moyen/fort ;
+- `review` : revue à plus faible sévérité ;
+- `optimize` : maintenance/optimisation ;
+- `watch` : observation.
 
-## Architecture
+Le classement n'exécute aucune action.
 
-Le bloc `architecture_analysis` est informatif et ne constitue pas une pénalité automatique.
+## Diagnostic Trust V1
 
-Il expose :
+Bloc : `diagnostic_trust`.
 
-- `complexity_score` / `complexity_label` ;
-- `entity_dependency_count` ;
-- `entity_edge_count` ;
-- `shared_actuator_count` ;
-- `helper_hub_count` ;
-- `trigger_hub_count` ;
-- `closed_loop_count` ;
-- `top_hotspots` ;
-- `shared_actuators` ;
-- `helper_hubs` ;
-- `trigger_hubs` ;
-- `closed_loops` ;
-- `automation_risk_profiles` ;
-- `top_sources`.
+Le score de confiance du scan est séparé du score de santé de Home Assistant. Il est dégradé lorsque le moteur rencontre notamment :
 
-Le but est d'identifier les zones où une future modification est susceptible d'avoir un effet large.
+- quality gate en échec ;
+- incohérence interne ;
+- faible confiance de flow ;
+- erreurs de lineage ;
+- cibles dynamiques non résolues.
 
-## Corrélation des causes racines
+Ce mécanisme évite de présenter un rapport incomplet avec la même assurance qu'un rapport entièrement validé.
 
-Le moteur réutilise les incidents déterministes issus des registres :
+## Report Self-Check V1
 
-- intégration hors ligne ;
-- intégration partiellement dégradée ;
-- appareil isolé hors ligne ;
-- cluster d'appareils partageant un motif ;
-- observations transitoires.
+Bloc : `self_check`.
 
-Les diagnostics génériques `HD-ENT-001` et `HD-ENT-003` peuvent rester dans les findings techniques mais sont retirés du plan d'action si des causes racines expliquent déjà le volume d'entités concerné.
+L'auto-contrôle vérifie notamment :
 
-`HD-REG-002` de faible confiance est également supprimé du plan lorsque le registre ne fournit aucune preuve d'orphelin probable.
+- version et schéma ;
+- scores 0–100 ;
+- compteurs findings/sévérités ;
+- unicité des IDs ;
+- cohérence `action_plan.total` et `counts` ;
+- cohérence `diagnostic_summary` ;
+- identité des paires de contrôleurs ;
+- compteurs Resilience V4 ;
+- bornes des taux de Flow ;
+- compteurs temporels ;
+- invariants de confidentialité ;
+- absence de lecture d'état ajoutée par la couche 0.9 ;
+- sérialisation JSON ;
+- absence de NUL ;
+- taille locale raisonnable.
 
-## Temporalité V2
+Un `self_check.status=fail` indique que le rapport doit être considéré comme techniquement incohérent, même si certaines conclusions individuelles paraissent plausibles.
 
-L'historique local est limité aux 20 derniers scans.
+## Entity Flow V3.1
 
-Chaque snapshot conserve uniquement :
+Le graphe différencie :
 
-- date ;
-- score V4 ;
-- éventuel score historique V3 ;
-- diagnostics actifs ;
-- incidents de registre ;
-- compteurs de priorité ;
-- compteurs `unavailable` / `unknown` ;
-- quelques métriques d'architecture ;
-- score de dette de maintenance.
+- triggers ;
+- contrôles ;
+- appels ;
+- lectures ;
+- cibles dynamiques et confiance.
 
-Un diagnostic peut être :
+Les templates Jinja ne sont jamais exécutés. Les cibles non démontrables restent explicitement incertaines.
 
-- `baseline` ;
-- `new` ;
-- `persistent` ;
-- `recurrent`.
+## Controller Semantics V6
 
-Pour les incidents du registre, un signal ponctuel est moins pénalisé. Sa pondération augmente progressivement s'il persiste sur plusieurs scans.
+V6 combine les preuves des générations précédentes :
 
-La migration accepte les anciennes entrées `health_score_v3` afin de ne pas perdre l'historique 0.6.
+- états mutuellement exclusifs ;
+- temps fixes exclusifs ;
+- commandes déterministes équivalentes ;
+- réconciliation de démarrage ;
+- handoffs par helper ;
+- conditions `states(entity) in [...]` littérales ;
+- interlock correctif direct ;
+- interlock médié.
 
-## Régressions
+Une preuve ne supprime une paire de la revue que si les chemins de commandes opposées sont couverts par une logique statique suffisante.
 
-`regression_analysis` compare le scan courant au précédent et expose :
+## Resilience V4
 
-- variation du score ;
-- nouveaux diagnostics ;
-- nouvelles priorités immédiates ;
-- diagnostics résolus ;
-- diagnostics persistants ;
-- état `stable`, `improved` ou `degraded` ;
-- indicateur `requires_attention`.
+Les dépendances critiques sont séparées selon leur rôle opérationnel :
 
-Une baisse significative du score ou l'apparition d'un nouveau diagnostic `action_now` peut faire passer le scan en régression.
+- contrôle physique ;
+- contrôle helper ;
+- observation ;
+- autre contrôle.
 
-## Score V4
+Seuls les consommateurs physiques pertinents alimentent le risque SPOF externe. V4 reconnaît aussi certains comportements fail-safe : `numeric_state`, variable de validité, branche de repli explicite.
 
-Modèle : `root_cause_temporal_v4`.
+## Entity Lineage et Blast Radius
 
-Le score est calculé sur le plan corrélé final, et non sur les volumes bruts d'états.
+Le lineage relie :
 
-La pénalité dépend de :
+`source -> entité dérivée -> automatisation`
 
-- priorité ;
-- sévérité ;
-- confiance ;
-- persistance ;
-- impact de dépendance.
+Les arêtes suffisamment sûres peuvent enrichir le blast radius d'une panne registry. Les sorties seulement supposées par nom ne sont pas utilisées comme preuve forte tant qu'elles ne sont pas confirmées dans le graphe effectif.
 
-Des plafonds de pénalité par domaine évitent qu'une seule cause produisant de nombreux symptômes ne soit comptée plusieurs fois.
+## Temporal V3.1
 
-Le rapport expose le détail dans `score_meta.penalty_breakdown` et `score_meta.domain_penalties`.
+Historique compact limité à 20 snapshots. Il conserve des IDs, compteurs, scores et timestamps, sans états bruts.
 
-Le score reste un indicateur Alpha et non une certification.
+La persistance nécessite des observations séparées dans le temps. Une disparition du plan mais pas du diagnostic est classée comme déclassement, pas comme résolution réelle.
 
-## Dette de maintenance
+## Scores
 
-`maintenance_debt` est volontairement séparé de `scores`.
+### Score V4
 
-Il agrège notamment :
+Reste le score technique primaire pour préserver la continuité de l'historique.
 
-- références absentes ;
-- orphelins probables ;
-- candidats locaux à revoir ;
-- traces de secrets dans archives ;
-- couverture partielle des automatisations YAML.
+### Score V5 Preview
 
-Le but est de montrer qu'une installation peut fonctionner correctement tout en accumulant une dette de configuration.
+Reste non destructif (`applied_to_primary_score=false`). Il sert à tester une future migration et à produire des scénarios de gain après correction.
 
-## Quality gates
+La couche produit 0.9 ne modifie aucun des deux calculs en amont.
 
-Avant présentation du rapport, HA Doctor produit des contrôles sur ses propres entrées :
+## Exports
 
-- API ;
-- parsing YAML ;
-- résolution des blueprints ;
-- disponibilité des registres ;
-- confidentialité ;
-- nettoyage du graphe ;
-- cohérence des compteurs plan/résumé.
+### Share V3
 
-Un échec de quality gate doit être visible afin d'éviter de donner une confiance excessive à un rapport incomplet.
+Schéma : `ha-doctor-share/3`.
 
-## Plan d'action V2
+- modèle : `assistant_share_report_v3` ;
+- cible : 28 Ko ;
+- plafond dur : 32 Ko ;
+- conservation des IDs de findings/actions ;
+- suppression progressive des sections secondaires en cas de dépassement ;
+- aucun état brut, YAML brut ou secret.
 
-`action_plan` est construit après :
+### Markdown support
 
-1. tri par priorité / sévérité / confiance ;
-2. déduplication ;
-3. suppression du bruit expliqué par des causes racines ;
-4. contexte temporel ;
-5. blast radius.
+`build_markdown_summary()` génère un résumé destiné à être lu directement : verdict, scores, priorités, actions, évolution, self-check et confidentialité.
 
-Chaque action expose un champ `why_now` expliquant pourquoi elle se trouve à cette position.
+## API 0.9
 
-Le bloc `diagnostic_summary` est ensuite reconstruit à partir de ce plan final afin d'empêcher une divergence entre les compteurs affichés et les actions réellement proposées.
+Endpoints hérités :
 
-## API 0.7
+- `/api/status`
+- `/api/report`
+- `/api/summary`
+- `/api/insights`
+- `/api/actions`
+- `/api/architecture`
+- `/api/quality`
+- `/api/flow`
+- `/api/coverage`
+- `/api/history`
+- `/api/control-intelligence`
+- `/api/diagnostic?id=...`
+- `/health`
 
-- `/api/status` : état du scanner ;
-- `/api/version` : version et schéma ;
-- `/api/report` : rapport complet ;
-- `/api/summary` : rapport compact non anonymisé ;
-- `/api/insights` : synthèse produit ;
-- `/api/actions` : plan d'action ;
-- `/api/architecture` : architecture et métadonnées du graphe ;
-- `/api/quality` : quality gates, maintenance et privacy ;
-- `/api/history` : historique agrégé ;
-- `/api/diagnostic?id=...` : détail d'un diagnostic ;
-- `/api/download*` : exports ;
-- `/health` : healthcheck HTTP.
+Endpoints 0.9 :
 
-## Schéma du rapport
+- `/api/version`
+- `/api/doctor-view`
+- `/api/self-check`
+- `/api/share-report`
+- `/api/download-share`
+- `/api/download-support-summary`
 
-Version : `ha-doctor-report/0.7`.
+Aucun endpoint d'écriture Home Assistant n'est introduit.
 
-Nouveaux blocs importants :
+## Packaging et CI
 
-- `dependency_graph_meta`
-- `architecture_analysis`
-- `regression_analysis`
-- `maintenance_debt`
-- `quality_gates`
-- `recommendation_queue`
-- `report_schema`
+Le Dockerfile conserve `COPY *.py ./`.
 
-Les blocs 0.5/0.6 restent conservés autant que possible pour faciliter la compatibilité.
+La CI 0.9 vérifie :
 
-## Robustesse de l'App
-
-Le Dockerfile 0.7 utilise `COPY *.py ./` afin qu'un nouveau module Python ne soit plus oublié dans l'image Home Assistant.
-
-La CI réalise une construction réelle de l'image puis vérifie :
-
-- présence des modules 0.7 ;
-- imports de l'application dans le conteneur ;
+- tous les tests historiques ;
+- tests 0.9 ;
+- `py_compile` de tous les modules ;
+- syntaxe JavaScript de toutes les couches UI ;
 - cohérence de version ;
-- présence des assets Web ;
-- tests unitaires ;
-- compilation Python.
+- build Docker réel ;
+- présence et import des modules ;
+- endpoints HTTP 0.9 ;
+- export Share V3 borné ;
+- résumé Markdown ;
+- non-régression Semantics V6 / Resilience V4.
 
-Cette vérification cible explicitement les régressions de packaging et de démarrage.
+## Politique de livraison
 
-## Interface
-
-Six vues principales :
-
-1. Vue d'ensemble ;
-2. Plan d'action ;
-3. Architecture ;
-4. Intégrations & appareils ;
-5. Historique ;
-6. Qualité & confidentialité.
-
-Le plan d'action peut être filtré par texte, priorité, domaine et confiance.
-
-## Limites Alpha 0.7
-
-- Jinja totalement dynamique reste difficile à analyser statiquement ;
-- le graphe représente la configuration connue, pas toutes les branches d'exécution possibles ;
-- l'exclusivité entre automatisations dépendant de templates complexes peut nécessiter une lecture humaine ;
-- les logs Home Assistant ne sont pas encore corrélés automatiquement à chaque diagnostic ;
-- le maillage Zigbee/MQTT n'est pas encore diagnostiqué en profondeur ;
-- les causes racines restent probabilistes ;
-- aucune réparation automatique n'est exécutée.
+0.9 inaugure un modèle de **milestones** : plusieurs améliorations cohérentes sont regroupées dans une même version visible plutôt que de multiplier les micro-releases.
