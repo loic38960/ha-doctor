@@ -7,8 +7,11 @@ state request is performed.
 import time
 
 import scanner_v088 as base
-from product_v090 import REPORT_SCHEMA, VERSION, apply_product_intelligence
+from product_v090 import apply_product_intelligence
 from selfcheck_v090 import run_self_check
+
+VERSION = "0.9.0"
+REPORT_SCHEMA = "ha-doctor-report/0.9"
 
 
 def scan(include_yaml=True):
