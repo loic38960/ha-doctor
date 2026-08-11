@@ -4,154 +4,138 @@
 
 HA Doctor est une App Home Assistant de diagnostic **locale, explicative et strictement en lecture seule**. Elle analyse les états, registres et YAML autorisés, corrèle les symptômes, identifie les causes racines et transforme le résultat en décisions et playbooks manuels.
 
-## HA Doctor 0.16 — Evidence Precision Engine
+## HA Doctor 0.17 — Resolution & Attribution Engine
 
-0.16 part du principe qu'un diagnostic large n'est pas forcément une action large. Le moteur conserve le contexte architectural, mais la priorité client repose maintenant sur **ce qui reste réellement non résolu**.
+0.17 part d'un principe simple : **une revue manuelle ne doit rester dans le rapport que si HA Doctor n'a pas assez de preuve pour la résoudre lui-même**.
 
 Pipeline :
 
 1. une acquisition Home Assistant, snapshot éphémère unique ;
 2. Flow, lineage, Registry, architecture et analyse statique ;
-3. **Condition Semantics V11** ;
-4. **Controller Impact V2** ;
-5. **Resilience Precision V5** ;
-6. classification feedback / actions dupliquées ;
-7. **Temporal V7** ;
-8. **Decision Engine V4** et ordre canonique ;
+3. Condition Semantics V11 et Controller Impact V2 ;
+4. Resilience V6 Guard Actionable ;
+5. Automation Feedback V2 + Duplicate Semantics V2 ;
+6. Missing Reference Intelligence V1 ;
+7. Temporal V8 + Score Attribution V1 ;
+8. Decision Engine V5 ;
 9. staging de publication ;
-10. **Self-Check V8** ;
+10. Self-Check V9 sur le rapport et le vrai Share V11 ;
 11. release gate ;
 12. commit/abort puis validation post-commit.
 
-Aucune couche 0.16 ne provoque de seconde lecture des états Home Assistant.
+Aucune couche 0.17 ne provoque de seconde lecture des états Home Assistant.
 
-## Controller Impact V2 — unresolved scope
+## Résolution avant revue
 
-Les versions précédentes pouvaient conserver le blast radius du finding global `HD-AUTO-003` alors que l'analyse sémantique avait déjà résolu la majorité des paires.
+Chaque décision reçoit maintenant un état :
 
-0.16 sépare désormais :
+- `manual_fix_ready` — preuve suffisante pour proposer une correction manuelle précise ;
+- `logic_review_required` — l'intention humaine reste nécessaire ;
+- `statically_resolved` — la relation a été expliquée statiquement ;
+- `watch_only` — visible mais sans priorité opérationnelle actuelle ;
+- `optimization` ;
+- `external_restore_if_needed`.
 
-- **contexte historique large** : utile pour comprendre l'architecture ;
-- **scope physique encore ouvert** : seul scope utilisé pour la priorité opérationnelle.
+Le score technique historique n'est pas artificiellement augmenté par cette couche.
 
-Le moteur calcule :
+## Automation Feedback V2
 
-- nombre exact de paires physiques non résolues ;
-- actionneurs physiques concernés ;
-- automatisations réellement présentes dans ces paires ;
-- impact pondéré de ce scope précis ;
-- paires de helpers conservées séparément.
+Une automation qui déclenche sur une entité qu'elle commande n'est pas automatiquement une boucle.
 
-Un ancien blast radius de 18 automatisations ne peut donc plus être présenté comme l'impact courant si une seule paire physique à deux automatisations reste ouverte.
+HA Doctor distingue notamment :
 
-## Resilience Precision V5 — phase-aware
+- une transition terminale : trigger `to: on`, puis commande `off` ; une future réentrée vers `on` est nécessaire pour redéclencher ;
+- une réaffirmation du même état ;
+- un trigger state large susceptible d'observer sa propre transition ;
+- une action pouvant restaurer l'état cible du trigger ;
+- les cas encore insuffisamment prouvés.
 
-Une dépendance capteur n'a pas le même risque selon le moment où elle est utilisée.
+**Aucune boucle runtime n'est déclarée comme prouvée à partir du YAML seul.**
 
-0.16 distingue statiquement :
+## Duplicate Semantics V2
 
-- `pre_control_trigger` ;
-- `pre_control_decision` ;
-- `post_action_confirmation` ;
-- `trigger_plus_post_confirmation` ;
-- `mixed_feedback_control` ;
-- `unresolved_reference_phase`.
+Un doublon consécutif exact à effet de bord, par exemple deux notifications identiques, peut devenir une correction `fix_now` avec haute confiance.
 
-Une donnée uniquement utilisée après une commande physique pour confirmer le résultat n'est plus automatiquement assimilée à une dépendance décisionnelle avant action.
+La suppression reste toujours manuelle : HA Doctor demande de confirmer que la répétition n'est pas volontaire et conserve `automatic_removal_safe=false`.
 
-Un risque `must_fix` n'est déclassé que si aucune dépendance pré-contrôle non protégée n'est prouvée et qu'une phase plus faible est statiquement identifiable. Le score V4 historique n'est pas recalculé rétroactivement par cette couche.
+## Missing Reference Intelligence V1
 
-## Automation Precision V1
+Les références absentes sont classées selon leur contexte et leur impact opérationnel.
 
-### Feedback automation
+HA Doctor peut distinguer une référence d'archive d'une référence runtime, mais **n'invente jamais un entity_id de remplacement**.
 
-`HD-AUTO-008` est maintenant qualifié :
+`replacement_inference_enabled=false` est un invariant contrôlé par le Self-Check.
 
-- `state_reassertion_feedback` ;
-- `state_transition_feedback` ;
-- `controlled_entity_feedback` ;
-- `feedback_loop_review`.
+## Resilience V6 — Guard Actionable
 
-HA Doctor **ne prétend jamais avoir prouvé une boucle runtime** à partir de cette analyse statique.
+Les dépendances externes sont séparées en :
 
-### Actions consécutives identiques
+- pré-contrôle non protégé → `must_fix` ;
+- fallback faible → `hardening`.
 
-Les doublons exacts sont classés comme :
+Pour chaque cas, HA Doctor produit une stratégie manuelle : garde `unavailable/unknown` avant commande physique ou durcissement du fallback pour distinguer une mesure absente d'un zéro numérique.
 
-- `side_effect_duplicate` — par exemple deux notifications identiques ;
-- `idempotent_control_candidate` ;
-- `repeated_script_call` ;
-- `service_side_effect_unknown`.
+## Controller Impact V2
 
-Même lorsqu'un doublon paraît évident, HA Doctor ne le supprime jamais automatiquement.
+La priorité ne repose plus sur le blast radius historique global de `HD-AUTO-003` mais sur les **paires physiques réellement encore ouvertes**.
 
-## Decision Engine V4 — Canonical Decision Order
+Le contexte architectural large reste disponible, mais il ne peut plus faire croire qu'un conflit courant concerne 18 automatisations si la dernière paire réelle n'en concerne que deux.
 
-Une seule politique d'ordre est utilisée dans :
+## Temporal V8 — Score Attribution
+
+Le score canonique reste `published_primary_score_v1`.
+
+À partir des snapshots 0.17 publiés, HA Doctor stocke également :
+
+- les scores finaux par domaine ;
+- unavailable / unknown ;
+- le nombre d'états.
+
+Si la baseline précédente est 0.16.1 et ne contient pas ces détails, le premier rapport 0.17 indique honnêtement :
+
+`baseline_domain_detail_unavailable`
+
+Il ne devine pas la cause d'un ancien delta. Une fois une baseline 0.17 publiée, les scans suivants peuvent expliquer les variations par domaine.
+
+## Decision Engine V5
+
+L'ordre canonique est partagé par :
 
 - Action Plan ;
 - Decision Engine ;
 - Doctor View ;
-- `diagnostic_summary.top_actions` ;
-- Share Report.
+- top actions ;
+- rapport support.
 
-Ordre :
+Le moteur privilégie les corrections prouvées, puis les revues à impact réel, et laisse les incidents externes sans blast radius en surveillance.
 
-1. voie opérationnelle ;
-2. pertinence ;
-3. score de priorité de précision ;
-4. sévérité ;
-5. confiance ;
-6. identifiant stable.
+## Self-Check V9
 
-Les incidents externes sans blast radius restent dans `watch` et ne remontent pas devant une correction locale prouvée.
+Une incohérence bloque la publication canonique. Sont notamment contrôlés :
 
-## Temporal V7 — baseline publiée visible
+- identité de tous les contrats 0.17 ;
+- snapshot unique et zéro lecture HA supplémentaire ;
+- aucune écriture / aucun auto-fix ;
+- domaine présent pour chaque décision ;
+- playbooks V5 ;
+- résolution correcte des doublons et feedbacks ;
+- aucune invention de référence ;
+- must-fix vs hardening Résilience ;
+- honnêteté de l'attribution du score ;
+- ordre Action Plan / Decision Engine ;
+- vrai fichier support final ;
+- transaction d'historique canonique.
 
-La transaction de publication `published_primary_score_v1` reste inchangée.
-
-0.16 rend toutefois la dernière baseline réellement publiée visible même si elle est trop récente pour être utilisée dans un delta à cause de la protection anti-rescan.
-
-Le rapport expose notamment :
-
-- dernière baseline publiée ;
-- âge de cette baseline ;
-- éligibilité au delta ;
-- scan courant devenu ou non baseline canonique ;
-- nombre de snapshots publiés incluant le scan courant ;
-- score candidat pour le prochain scan.
-
-Un rapport bloqué ne peut toujours jamais devenir une baseline.
-
-## Self-Check V8
-
-Le Self-Check vérifie désormais en plus :
-
-- scope contrôleur exact = paires physiques restantes ;
-- liste exacte des automatisations de ce scope ;
-- absence d'utilisation du blast radius historique pour la priorité ;
-- Resilience phase-aware ;
-- classifications de feedback sans faux claim runtime ;
-- doublons exacts sans auto-cleanup ;
-- **ordre strictement identique** entre Action Plan, Decision Engine et résumé public ;
-- Share V10 réel ;
-- transaction historique 0.16 estampillée avec les contrats 0.16.
-
-Une incohérence bloque la publication canonique.
-
-## Share Report V10
+## Share Report V11
 
 `/api/download-share` génère `ha-doctor-support.json`.
 
-- cible : **20 Ko** ;
-- plafond dur : **24 Ko** ;
+- cible : **18 Ko** ;
+- plafond dur : **22 Ko** ;
 - toutes les identités findings/actions conservées ;
-- ordre canonique conservé ;
-- impact contrôleur exact conservé ;
-- preuve événementielle conservée ;
-- trace résilience phase-aware conservée ;
-- feedback/doublons compactés ;
-- visibilité de baseline publiée conservée ;
+- résolution et attribution conservées ;
+- scope contrôleur exact conservé ;
+- stratégies Résilience conservées ;
 - aucun état brut ;
 - aucun YAML brut ;
 - aucune valeur de secret ;
@@ -165,10 +149,9 @@ Une incohérence bloque la publication canonique.
 - `/api/summary`
 - `/api/doctor-view`
 - `/api/self-check`
-- `/api/operational-decisions`
-- `/api/evidence-precision`
-- `/api/decision-order`
-- `/api/published-baseline`
+- `/api/resolution`
+- `/api/score-attribution`
+- `/api/resilience-guards`
 - `/api/share-report`
 - `/api/download-share`
 - `/api/download-support-summary`
@@ -201,24 +184,22 @@ Dans Home Assistant :
 
 ## Validation CI
 
-La CI valide :
+La CI valide notamment :
 
-- toute la suite unitaire historique + 0.16 ;
-- compilation de tous les modules Python ;
+- toute la suite unitaire historique + 0.17 ;
+- compilation de toutes les sources Python ;
 - JavaScript UI ;
-- architecture snapshot unique ;
-- scope contrôleur exact ;
-- phase-aware resilience ;
-- feedback et doublons ;
-- ordre canonique ;
-- contrat de publication 0.16 ;
-- Share V10 ;
+- snapshot HA unique ;
+- résolution de transition state ;
+- doublon exact manuel uniquement ;
+- références absentes sans remplacement inventé ;
+- Résilience weak vs unprotected ;
+- attribution honnête avec baseline 0.16 ;
+- attribution détaillée après baseline 0.17 ;
+- stockage canonique des scores par domaine ;
+- Share V11 ;
 - build réel de l'image Home Assistant App ;
 - imports packagés ;
 - démarrage réel de l'API HTTP.
 
-## Politique de versions
-
-Les versions publiques sont des **milestones**. Les micro-versions sont réservées aux régressions critiques nécessitant un hotfix immédiat.
-
-HA Doctor reste expérimental : son score est un indicateur de diagnostic et de maintenance, pas une certification de sécurité ou de conformité.
+Voir aussi [`RELEASE_0.17.0.md`](RELEASE_0.17.0.md).
