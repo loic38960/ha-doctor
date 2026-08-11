@@ -1,6 +1,6 @@
 """Central public contracts for HA Doctor 0.16 Evidence Precision Engine."""
 
-VERSION = "0.16.0"
+VERSION = "0.16.1"
 REPORT_SCHEMA = "ha-doctor-report/0.16"
 SHARE_SCHEMA = "ha-doctor-share/10"
 SHARE_MODEL = "assistant_share_report_v10"

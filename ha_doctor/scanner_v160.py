@@ -9,6 +9,8 @@ baseline visibility. No additional Home Assistant state read.
 import time
 import scanner_v088 as acquisition
 import intelligence_v088 as intelligence
+import sharing_v160 as sharing_module
+import selfcheck_v160 as selfcheck_module
 from semantics_v160 import refine_condition_semantics_v11
 from resilience_v160 import refine_resilience_v5
 from temporal_v160 import (
@@ -18,10 +20,18 @@ from temporal_v160 import (
 from product_v160 import apply_product_intelligence_v8, install_public_contract_v160
 from selfcheck_v160 import run_self_check_v8, post_commit_validation_v8
 from finalize_v160 import finalize_release_v8
+from hotfix_v161 import apply_hotfix_v161
+from sharing_v161 import build_share_report as build_share_report_v161
 from contracts_v160 import (
     VERSION, REPORT_SCHEMA, HISTORY_CONTRACT, HISTORY_POLICY, PUBLICATION_MODEL,
     DECISION_MODEL, CONDITION_MODEL, CONTROLLER_IMPACT_MODEL, RESILIENCE_MODEL,
 )
+
+# app_v160 imports scanner before importing sharing_v160's function symbols. Patch
+# the module here so runtime endpoints and Self-Check use the exact same compact
+# Share V10 implementation.
+sharing_module.build_share_report = build_share_report_v161
+selfcheck_module.build_share_report = build_share_report_v161
 
 
 def _append_publication_failure(report, key, detail):
@@ -77,6 +87,7 @@ def scan(include_yaml=True):
     install_public_contract_v160(report)
     t0 = time.monotonic(); apply_product_intelligence_v8(report); phases["precision_product_and_decision"] = round(time.monotonic() - t0, 4)
     install_public_contract_v160(report)
+    t0 = time.monotonic(); apply_hotfix_v161(report); phases["publication_contract_hotfix"] = round(time.monotonic() - t0, 4)
 
     t0 = time.monotonic(); stage = stage_publication(report); phases["publication_stage"] = round(time.monotonic() - t0, 4)
     report.setdefault("score_history_integrity", {})["publication_stage"] = stage
@@ -123,12 +134,13 @@ def scan(include_yaml=True):
         "publication_transaction_validated_during_scan": True, "canonical_order_validated_during_scan": True,
     })
     report.setdefault("diagnostic_engine", {}).update({
-        "version": "evidence_precision_engine_0_16", "condition_semantics_v11": True,
+        "version": "evidence_precision_engine_0_16_1", "condition_semantics_v11": True,
         "controller_impact_model": CONTROLLER_IMPACT_MODEL, "resilience_precision_model": RESILIENCE_MODEL,
         "decision_engine_v4": True, "automation_precision_v1": True, "self_check_v8_precision": True,
         "temporal_v7_baseline_visibility": True, "history_contract": HISTORY_CONTRACT,
         "history_policy": HISTORY_POLICY, "publication_model": PUBLICATION_MODEL,
         "decision_model": DECISION_MODEL, "condition_model": CONDITION_MODEL,
+        "v161_publication_hotfix": True,
         "additional_home_assistant_state_reads": 0, "automatic_fix": False, "read_only": True,
     })
     return report
