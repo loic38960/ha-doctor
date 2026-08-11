@@ -4,155 +4,158 @@
 
 HA Doctor est une App Home Assistant de diagnostic **locale, explicative et strictement en lecture seule**. Elle analyse les états, registres et YAML autorisés, corrèle les symptômes, identifie les causes racines et transforme le résultat en décisions et playbooks manuels.
 
-## HA Doctor 0.15 — Trust & Publication Engine
+## HA Doctor 0.16 — Evidence Precision Engine
 
-0.15 durcit le passage entre **diagnostic interne** et **rapport publiable**.
+0.16 part du principe qu'un diagnostic large n'est pas forcément une action large. Le moteur conserve le contexte architectural, mais la priorité client repose maintenant sur **ce qui reste réellement non résolu**.
 
-Pipeline public :
+Pipeline :
 
-1. une acquisition Home Assistant avec un snapshot éphémère unique ;
-2. la preuve de ce snapshot est installée immédiatement dans `scan_performance` ;
-3. analyses statiques, Flow, lineage, Registry, résilience ;
-4. **Condition Semantics V10** ;
-5. **Temporal V6** ;
-6. installation du contrat public courant ;
-7. **Decision Engine V3** ;
-8. staging non canonique dans l'historique ;
-9. **Self-Check V7** sur le rapport courant et le vrai Share V9 final ;
-10. release gate ;
-11. commit ou abort de la transaction de publication ;
-12. validation post-commit avec possibilité de révocation.
+1. une acquisition Home Assistant, snapshot éphémère unique ;
+2. Flow, lineage, Registry, architecture et analyse statique ;
+3. **Condition Semantics V11** ;
+4. **Controller Impact V2** ;
+5. **Resilience Precision V5** ;
+6. classification feedback / actions dupliquées ;
+7. **Temporal V7** ;
+8. **Decision Engine V4** et ordre canonique ;
+9. staging de publication ;
+10. **Self-Check V8** ;
+11. release gate ;
+12. commit/abort puis validation post-commit.
 
-Aucun scan bloqué ne peut devenir une baseline de score.
+Aucune couche 0.16 ne provoque de seconde lecture des états Home Assistant.
 
-## Trust-first ordering
+## Controller Impact V2 — unresolved scope
 
-Le rapport 0.14 réel a révélé deux problèmes d'ordre :
+Les versions précédentes pouvaient conserver le blast radius du finding global `HD-AUTO-003` alors que l'analyse sémantique avait déjà résolu la majorité des paires.
 
-- le contrat Share était évalué avant d'être installé, ce qui créait un faux `share_schema_fresh=false` ;
-- la preuve de snapshot unique était ajoutée après le calcul de confiance, ce qui produisait `single_snapshot_evidence=false` malgré une acquisition correcte.
+0.16 sépare désormais :
 
-0.15 impose maintenant ces invariants :
+- **contexte historique large** : utile pour comprendre l'architecture ;
+- **scope physique encore ouvert** : seul scope utilisé pour la priorité opérationnelle.
 
-- contrat courant installé **avant** `public_contract_truth` ;
-- preuve d'acquisition installée **avant** Doctor Trust ;
-- Self-Check contrôle explicitement les deux ;
-- CI vérifie l'ordre du pipeline.
+Le moteur calcule :
 
-## Publication Transaction V1
+- nombre exact de paires physiques non résolues ;
+- actionneurs physiques concernés ;
+- automatisations réellement présentes dans ces paires ;
+- impact pondéré de ce scope précis ;
+- paires de helpers conservées séparément.
 
-L'historique fonctionne désormais comme une transaction en deux phases.
+Un ancien blast radius de 18 automatisations ne peut donc plus être présenté comme l'impact courant si une seule paire physique à deux automatisations reste ouverte.
 
-### Stage
+## Resilience Precision V5 — phase-aware
 
-Le scan courant est enregistré comme candidat :
+Une dépendance capteur n'a pas le même risque selon le moment où elle est utilisée.
 
-- `publication_complete=false` ;
-- aucun `score_contract` canonique ;
-- aucun `final_primary_score` ;
-- rôle `publication_candidate`.
+0.16 distingue statiquement :
 
-### Commit
+- `pre_control_trigger` ;
+- `pre_control_decision` ;
+- `post_action_confirmation` ;
+- `trigger_plus_post_confirmation` ;
+- `mixed_feedback_control` ;
+- `unresolved_reference_phase`.
 
-Le score n'est promu que si :
+Une donnée uniquement utilisée après une commande physique pour confirmer le résultat n'est plus automatiquement assimilée à une dépendance décisionnelle avant action.
 
-- Self-Check V7 ne bloque pas ;
-- l'export final est valide ;
-- les contrats publics sont cohérents ;
-- la preuve de snapshot unique est présente ;
-- le release gate autorise la publication.
+Un risque `must_fix` n'est déclassé que si aucune dépendance pré-contrôle non protégée n'est prouvée et qu'une phase plus faible est statiquement identifiable. Le score V4 historique n'est pas recalculé rétroactivement par cette couche.
 
-Le snapshot reçoit alors `published_primary_score_v1` et devient une baseline possible.
+## Automation Precision V1
 
-### Abort / revoke
+### Feedback automation
 
-Si un contrôle final échoue :
+`HD-AUTO-008` est maintenant qualifié :
 
-- la transaction est avortée ;
-- les champs canoniques sont retirés ;
-- le candidat reste visible pour diagnostic ;
-- il ne peut jamais servir de référence au scan suivant.
+- `state_reassertion_feedback` ;
+- `state_transition_feedback` ;
+- `controlled_entity_feedback` ;
+- `feedback_loop_review`.
 
-## Condition Semantics V10 — Event Window Policy
+HA Doctor **ne prétend jamais avoir prouvé une boucle runtime** à partir de cette analyse statique.
 
-V9 savait déjà détecter une fenêtre numérique de politiques opposées. V10 ajoute une distinction essentielle :
+### Actions consécutives identiques
 
-**un trigger `numeric_state` est un événement de franchissement, pas un état continuellement exécuté.**
+Les doublons exacts sont classés comme :
 
-HA Doctor distingue donc :
+- `side_effect_duplicate` — par exemple deux notifications identiques ;
+- `idempotent_control_candidate` ;
+- `repeated_script_call` ;
+- `service_side_effect_unknown`.
 
-- `crossing_event_window` — deux commandes opposées liées à des franchissements numériques ;
-- `event_vs_policy_window` — un franchissement face à une autre politique ;
-- `state_policy_window` — overlap sans preuve de sémantique de franchissement.
+Même lorsqu'un doublon paraît évident, HA Doctor ne le supprime jamais automatiquement.
 
-Une fenêtre commune reste un point de logique à revoir, mais HA Doctor ne prétend plus qu'elle prouve une exécution simultanée ou une boucle continue.
+## Decision Engine V4 — Canonical Decision Order
 
-Pour les conflits événementiels, le playbook demande d'abord de décider si le comportement est un handoff volontaire, une hystérésis implicite ou un véritable conflit d'ownership.
+Une seule politique d'ordre est utilisée dans :
 
-## Decision Engine V3
+- Action Plan ;
+- Decision Engine ;
+- Doctor View ;
+- `diagnostic_summary.top_actions` ;
+- Share Report.
 
-Les voies restent :
+Ordre :
 
-- `fix_now` ;
-- `logic_review` ;
-- `restore_if_needed` ;
-- `watch` ;
-- `optimize`.
+1. voie opérationnelle ;
+2. pertinence ;
+3. score de priorité de précision ;
+4. sévérité ;
+5. confiance ;
+6. identifiant stable.
 
-0.15 ajoute un **Operational Summary** unique utilisé par le rapport, l'UI et l'export support. Le résumé client ne mélange plus les 6 incidents `watch` avec les revues logiques principales.
+Les incidents externes sans blast radius restent dans `watch` et ne remontent pas devant une correction locale prouvée.
 
-Les incidents Registry sans blast radius automation restent visibles mais ne passent pas devant un problème de logique ou de sécurité.
+## Temporal V7 — baseline publiée visible
 
-## Self-Check V7 — final export truth
+La transaction de publication `published_primary_score_v1` reste inchangée.
 
-Self-Check V7 valide directement le contrat courant, sans maquiller le rapport en ancienne version.
+0.16 rend toutefois la dernière baseline réellement publiée visible même si elle est trop récente pour être utilisée dans un delta à cause de la protection anti-rescan.
 
-Il contrôle notamment :
+Le rapport expose notamment :
 
-- identité version / schémas / modèles ;
-- ordre contrat → vérité publique ;
-- preuve snapshot unique visible par Doctor Trust ;
-- identité Action Plan ↔ Decision Engine ;
-- voies opérationnelles ;
-- sémantique événementielle V10 ;
-- source de vérité Sécurité / Maintenance ;
-- Temporal V6 ;
-- confidentialité et lecture seule ;
-- **le vrai Share V9 qui contient lui-même le Self-Check final**.
+- dernière baseline publiée ;
+- âge de cette baseline ;
+- éligibilité au delta ;
+- scan courant devenu ou non baseline canonique ;
+- nombre de snapshots publiés incluant le scan courant ;
+- score candidat pour le prochain scan.
 
-Après commit historique, un dernier contrôle vérifie encore :
+Un rapport bloqué ne peut toujours jamais devenir une baseline.
 
-- transaction réellement commitée ;
-- snapshot marqué publié ;
-- contrats publics toujours frais ;
-- export toujours sous le plafond dur.
+## Self-Check V8
 
-Ce contrôle peut révoquer la publication.
+Le Self-Check vérifie désormais en plus :
 
-## Share Report V9
+- scope contrôleur exact = paires physiques restantes ;
+- liste exacte des automatisations de ce scope ;
+- absence d'utilisation du blast radius historique pour la priorité ;
+- Resilience phase-aware ;
+- classifications de feedback sans faux claim runtime ;
+- doublons exacts sans auto-cleanup ;
+- **ordre strictement identique** entre Action Plan, Decision Engine et résumé public ;
+- Share V10 réel ;
+- transaction historique 0.16 estampillée avec les contrats 0.16.
+
+Une incohérence bloque la publication canonique.
+
+## Share Report V10
 
 `/api/download-share` génère `ha-doctor-support.json`.
 
-Nouvelle cible :
-
-- **22 Ko** cible ;
-- **26 Ko** plafond dur.
-
-Le rapport support conserve :
-
-- toutes les identités des findings ;
-- toutes les identités des actions ;
-- voies opérationnelles ;
-- top playbooks ;
-- preuve de policy overlap événementiel ;
-- trace Résilience ;
-- transaction de publication ;
-- Self-Check compact ;
-- vérité des contrats publics.
-
-Il ne recopie plus les listes d'exemples `unavailable/unknown` ni la ventilation complète des domaines, qui apportaient beaucoup de poids sans aider l'analyse support.
-
-Il n'inclut jamais : états bruts, YAML brut, valeur de secret ou graphe complet.
+- cible : **20 Ko** ;
+- plafond dur : **24 Ko** ;
+- toutes les identités findings/actions conservées ;
+- ordre canonique conservé ;
+- impact contrôleur exact conservé ;
+- preuve événementielle conservée ;
+- trace résilience phase-aware conservée ;
+- feedback/doublons compactés ;
+- visibilité de baseline publiée conservée ;
+- aucun état brut ;
+- aucun YAML brut ;
+- aucune valeur de secret ;
+- aucun graphe complet.
 
 ## API locale principale
 
@@ -160,24 +163,15 @@ Il n'inclut jamais : états bruts, YAML brut, valeur de secret ou graphe complet
 - `/api/version`
 - `/api/report`
 - `/api/summary`
-- `/api/insights`
-- `/api/actions`
-- `/api/architecture`
-- `/api/quality`
-- `/api/flow`
-- `/api/coverage`
-- `/api/history`
-- `/api/control-intelligence`
 - `/api/doctor-view`
 - `/api/self-check`
 - `/api/operational-decisions`
-- `/api/event-policy`
-- `/api/publication-transaction`
+- `/api/evidence-precision`
+- `/api/decision-order`
+- `/api/published-baseline`
 - `/api/share-report`
-- `/api/diagnostic?id=DX-...`
 - `/api/download-share`
 - `/api/download-support-summary`
-- `/api/download-anonymized`
 - `/health`
 
 ## Confidentialité et sécurité
@@ -187,7 +181,7 @@ Il n'inclut jamais : états bruts, YAML brut, valeur de secret ou graphe complet
 - `/ha_config` est monté en lecture seule ;
 - `secrets.yaml` n'est pas lu ;
 - `.storage` n'est pas parcouru directement ;
-- les registres passent par l'API WebSocket Home Assistant ;
+- les registres passent par l'API Home Assistant ;
 - les états bruts ne sont pas persistés ;
 - le token Supervisor n'est pas enregistré ;
 - les templates Jinja ne sont pas exécutés pour inventer des preuves ;
@@ -207,18 +201,20 @@ Dans Home Assistant :
 
 ## Validation CI
 
-La CI vérifie notamment :
+La CI valide :
 
-- tous les tests unitaires historiques et 0.15 ;
+- toute la suite unitaire historique + 0.16 ;
 - compilation de tous les modules Python ;
 - JavaScript UI ;
-- ordre trust-first du pipeline ;
-- contrat public installé avant son évaluation ;
-- sémantique de franchissement `numeric_state` ;
-- stage / commit / abort de l'historique ;
-- révocation des champs canoniques ;
-- construction réelle de l'image Home Assistant App ;
-- import des modules packagés ;
+- architecture snapshot unique ;
+- scope contrôleur exact ;
+- phase-aware resilience ;
+- feedback et doublons ;
+- ordre canonique ;
+- contrat de publication 0.16 ;
+- Share V10 ;
+- build réel de l'image Home Assistant App ;
+- imports packagés ;
 - démarrage réel de l'API HTTP.
 
 ## Politique de versions
