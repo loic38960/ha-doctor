@@ -20,76 +20,93 @@ jobs:
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.13 UI and contracts
+      - name: Validate 0.14 UI and contracts
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, contracts_v130
+          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, app_v140, contracts_v140
           source=Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced=app_v130.enhance_ui_v130(source)
-          assert 'HA Doctor 0.13 · Decision Engine' in enhanced
-          assert app_v130.VERSION == contracts_v130.VERSION == '0.13.0'
-          assert contracts_v130.REPORT_SCHEMA == 'ha-doctor-report/0.13'
-          assert contracts_v130.SHARE_SCHEMA == 'ha-doctor-share/7'
-          assert contracts_v130.DECISION_MODEL == 'decision_engine_v1_evidence_playbooks'
-          assert contracts_v130.CONDITION_MODEL == 'condition_semantics_v8_mandatory_guard_matrix'
-          assert contracts_v130.HISTORY_CONTRACT == 'published_primary_score_v1'
-          Path('/tmp/ha-doctor-v130-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130,encoding='utf-8')
+          enhanced=app_v140.enhance_ui_v140(source)
+          assert 'HA Doctor 0.14 · Consolidated Decision Engine' in enhanced
+          assert app_v140.VERSION == contracts_v140.VERSION == '0.14.0'
+          assert contracts_v140.REPORT_SCHEMA == 'ha-doctor-report/0.14'
+          assert contracts_v140.SHARE_SCHEMA == 'ha-doctor-share/8'
+          assert contracts_v140.DECISION_MODEL == 'decision_engine_v2_operational_lanes'
+          assert contracts_v140.CONDITION_MODEL == 'condition_semantics_v9_branch_policy_overlap'
+          assert contracts_v140.HISTORY_POLICY == 'publication_complete_required_v1'
+          Path('/tmp/ha-doctor-v140-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130+'\n'+app_v140.UI_PATCH_V140,encoding='utf-8')
           PY
-          node --check /tmp/ha-doctor-v130-ui.js
-          grep -q 'version: "0.13.0"' ha_doctor/config.yaml
-          grep -q 'app_v130.py' ha_doctor/run.sh
-          grep -q 'Starting HA Doctor 0.13.0' ha_doctor/run.sh
+          node --check /tmp/ha-doctor-v140-ui.js
+          grep -q 'version: "0.14.0"' ha_doctor/config.yaml
+          grep -q 'app_v140.py' ha_doctor/run.sh
+          grep -q 'Starting HA Doctor 0.14.0' ha_doctor/run.sh
+
+      - name: Enforce consolidated pipeline architecture
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          scanner=Path('ha_doctor/scanner_v140.py').read_text()
+          selfcheck=Path('ha_doctor/selfcheck_v140.py').read_text()
+          assert 'scanner_v120' not in scanner and 'scanner_v130' not in scanner
+          assert 'selfcheck_v120' not in selfcheck and 'selfcheck_v130' not in selfcheck
+          assert 'legacy_report_rewriting' in selfcheck
+          assert 'publication_complete_required_for_trust' in Path('ha_doctor/temporal_v140.py').read_text()
+          print('Consolidated architecture OK')
+          PY
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.13.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.14.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify Decision Engine modules
+      - name: Verify Consolidated Engine modules
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v130.py && test -f /app/scanner_v130.py && test -f /app/contracts_v130.py && test -f /app/semantics_v130.py && test -f /app/decision_v130.py && test -f /app/product_v130.py && test -f /app/selfcheck_v130.py && test -f /app/sharing_v130.py && test -f /app/finalize_v130.py && test -f /app/temporal_v130.py'
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v130,app_v130,scanner_v130,semantics_v130,decision_v130,product_v130,selfcheck_v130,sharing_v130,temporal_v130; assert contracts_v130.VERSION=='0.13.0'; print('0.13 packaged imports OK')"
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v140.py && test -f /app/scanner_v140.py && test -f /app/contracts_v140.py && test -f /app/semantics_v140.py && test -f /app/decision_v140.py && test -f /app/product_v140.py && test -f /app/selfcheck_v140.py && test -f /app/sharing_v140.py && test -f /app/finalize_v140.py && test -f /app/temporal_v140.py'
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v140,app_v140,scanner_v140,semantics_v140,decision_v140,product_v140,selfcheck_v140,sharing_v140,temporal_v140; assert contracts_v140.VERSION=='0.14.0'; print('0.14 packaged imports OK')"
 
-      - name: Smoke test V8 guard proof and decision playbooks
+      - name: Smoke test policy overlap and operational lanes
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from semantics_v130 import disjoint_mandatory_guard_evidence
-          from decision_v130 import build_decision_engine
-          p=disjoint_mandatory_guard_evidence({'input_boolean.phase':{'on'}},{'input_boolean.phase':{'off'}})
-          assert len(p)==1 and p[0]['reason']=='mandatory_literal_state_guards_are_disjoint'
-          r={'action_plan':{'items':[{'id':'DX-HD-CFG-006','title':'Integral','priority':'action_now','severity':'medium','source_type':'finding','source_id':'HD-CFG-006','confidence':'high','confidence_score':.99,'dependency_impact':{'level':'low','impacted_automation_count':0}}]},'product_intelligence':{'entity_noise':{}}}
-          d=build_decision_engine(r)
-          assert d['total']==1 and d['ready_for_manual_change_count']==1
-          pb=d['items'][0]['repair_playbook']
-          assert pb['repair_readiness']=='ready_for_manual_change' and pb['automatic_fix'] is False and pb['steps']
+          from semantics_v140 import _pair_numeric_relation
+          from decision_v140 import _operational_lane,_operational_relevance
+          overlap=_pair_numeric_relation({'numeric':[{'entity_id':'sensor.water','above':98}]},{'numeric':[{'entity_id':'sensor.water','below':100}]})
+          assert not overlap['disjoint'] and overlap['overlaps'][0]['above']==98 and overlap['overlaps'][0]['below']==100
+          disjoint=_pair_numeric_relation({'numeric':[{'entity_id':'sensor.grid','above':650}]},{'numeric':[{'entity_id':'sensor.grid','below':-1000}]})
+          assert disjoint['disjoint']
+          item={'source_type':'registry_integration','source_id':'music_assistant','priority':'verify','dependency_impact':{'level':'none','impacted_automation_count':0}}
+          lane=_operational_lane(item)
+          assert lane=='watch' and _operational_relevance(item,lane)=='low'
+          print('Policy overlap and lane smoke OK')
           PY
 
-      - name: Smoke test 0.13 canonical history metadata
+      - name: Smoke test publication-aware history
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           import os,tempfile
           from temporal_v060 import save_history,load_history
-          from temporal_v130 import sync_decision_history,validate_current_decision_snapshot
-          from contracts_v130 import ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL
+          from temporal_v140 import _snapshot_status,sync_publication_history,validate_current_publication_snapshot
+          from contracts_v140 import HISTORY_CONTRACT,ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL
+          assert _snapshot_status({'score_contract':HISTORY_CONTRACT,'final_primary_score':75,'publication_complete':False})['trusted'] is False
+          assert _snapshot_status({'score_contract':HISTORY_CONTRACT,'final_primary_score':75,'publication_complete':True})['trusted'] is True
           f=tempfile.NamedTemporaryFile(delete=False); path=f.name; f.close(); os.unlink(path)
-          save_history([{'generated_at':'2026-08-11T06:30:00Z','active_ids':[]}],path)
-          r={'generated_at':'2026-08-11T06:30:00Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'pass'}}
-          s=sync_decision_history(r,history_path=path,publication_complete=True)
-          v=validate_current_decision_snapshot(r,history_path=path)
-          assert s['synced'] and v['valid'],(s,v)
+          save_history([{'generated_at':'2026-08-11T07:00:00Z','active_ids':[]}],path)
+          r={'generated_at':'2026-08-11T07:00:00Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'fail'}}
+          sync_publication_history(r,history_path=path,publication_complete=False)
+          assert validate_current_publication_snapshot(r,history_path=path,require_published=False)['valid']
           snap=load_history(path)[-1]
-          assert snap['report_version']=='0.13.0' and snap['decision_model']==DECISION_MODEL and snap['condition_model']==CONDITION_MODEL
+          assert 'score_contract' not in snap and 'final_primary_score' not in snap and snap['publication_complete'] is False
           os.unlink(path)
+          print('Publication-aware history smoke OK')
           PY
 
-      - name: Runtime smoke test 0.13 API
+      - name: Runtime smoke test 0.14 API
         run: |
           set -euo pipefail
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v130.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v140.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.13.0"' /tmp/version.json
-          grep -q '"ha-doctor-share/7"' /tmp/version.json
-          grep -q '"decision_engine_v1_evidence_playbooks"' /tmp/version.json
-          grep -q '"condition_semantics_v8_mandatory_guard_matrix"' /tmp/version.json
+          grep -q '"0.14.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/8"' /tmp/version.json
+          grep -q '"decision_engine_v2_operational_lanes"' /tmp/version.json
+          grep -q '"condition_semantics_v9_branch_policy_overlap"' /tmp/version.json
+          grep -q '"publication_complete_required_v1"' /tmp/version.json
