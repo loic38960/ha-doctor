@@ -1,7 +1,7 @@
 name: "HA Doctor"
-version: "0.15.0"
+version: "0.16.0"
 slug: "ha_doctor"
-description: "Contrôle technique local, décisionnel, explicatif, transactionnel, temporellement fiable et partageable de votre installation Home Assistant"
+description: "Contrôle technique local, décisionnel, explicatif, précis, temporellement fiable et strictement en lecture seule de votre installation Home Assistant"
 arch:
   - amd64
   - aarch64
