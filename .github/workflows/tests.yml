@@ -20,93 +20,106 @@ jobs:
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.14 UI and contracts
+      - name: Validate 0.15 UI and contracts
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, app_v140, contracts_v140
+          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, app_v140, app_v150, contracts_v150
           source=Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced=app_v140.enhance_ui_v140(source)
-          assert 'HA Doctor 0.14 · Consolidated Decision Engine' in enhanced
-          assert app_v140.VERSION == contracts_v140.VERSION == '0.14.0'
-          assert contracts_v140.REPORT_SCHEMA == 'ha-doctor-report/0.14'
-          assert contracts_v140.SHARE_SCHEMA == 'ha-doctor-share/8'
-          assert contracts_v140.DECISION_MODEL == 'decision_engine_v2_operational_lanes'
-          assert contracts_v140.CONDITION_MODEL == 'condition_semantics_v9_branch_policy_overlap'
-          assert contracts_v140.HISTORY_POLICY == 'publication_complete_required_v1'
-          Path('/tmp/ha-doctor-v140-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130+'\n'+app_v140.UI_PATCH_V140,encoding='utf-8')
+          enhanced=app_v150.enhance_ui_v150(source)
+          assert 'HA Doctor 0.15 · Trust & Publication Engine' in enhanced
+          assert app_v150.VERSION == contracts_v150.VERSION == '0.15.0'
+          assert contracts_v150.REPORT_SCHEMA == 'ha-doctor-report/0.15'
+          assert contracts_v150.SHARE_SCHEMA == 'ha-doctor-share/9'
+          assert contracts_v150.SHARE_TARGET_BYTES == 22000
+          assert contracts_v150.DECISION_MODEL == 'decision_engine_v3_execution_board'
+          assert contracts_v150.CONDITION_MODEL == 'condition_semantics_v10_event_window_policy'
+          assert contracts_v150.PUBLICATION_MODEL == 'publication_transaction_v1'
+          Path('/tmp/ha-doctor-v150-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130+'\n'+app_v140.UI_PATCH_V140+'\n'+app_v150.UI_PATCH_V150,encoding='utf-8')
           PY
-          node --check /tmp/ha-doctor-v140-ui.js
-          grep -q 'version: "0.14.0"' ha_doctor/config.yaml
-          grep -q 'app_v140.py' ha_doctor/run.sh
-          grep -q 'Starting HA Doctor 0.14.0' ha_doctor/run.sh
+          node --check /tmp/ha-doctor-v150-ui.js
+          grep -q 'version: "0.15.0"' ha_doctor/config.yaml
+          grep -q 'app_v150.py' ha_doctor/run.sh
+          grep -q 'Starting HA Doctor 0.15.0' ha_doctor/run.sh
 
-      - name: Enforce consolidated pipeline architecture
+      - name: Enforce trust-first pipeline architecture
         run: |
           python - <<'PY'
           from pathlib import Path
-          scanner=Path('ha_doctor/scanner_v140.py').read_text()
-          selfcheck=Path('ha_doctor/selfcheck_v140.py').read_text()
-          assert 'scanner_v120' not in scanner and 'scanner_v130' not in scanner
-          assert 'selfcheck_v120' not in selfcheck and 'selfcheck_v130' not in selfcheck
-          assert 'legacy_report_rewriting' in selfcheck
-          assert 'publication_complete_required_for_trust' in Path('ha_doctor/temporal_v140.py').read_text()
-          print('Consolidated architecture OK')
+          scanner=Path('ha_doctor/scanner_v150.py').read_text()
+          product=Path('ha_doctor/product_v150.py').read_text()
+          selfcheck=Path('ha_doctor/selfcheck_v150.py').read_text()
+          assert 'scanner_v120' not in scanner and 'scanner_v130' not in scanner and 'scanner_v140' not in scanner
+          assert scanner.index('"single_state_snapshot_preserved": True') < scanner.index('apply_product_intelligence_v7(report)')
+          assert product.index('install_public_contract(report)') < product.index('_public_truth(report, decision)')
+          assert 'legacy_report_rewriting' in selfcheck and 'final_export_self_validated' in selfcheck
+          assert 'stage_publication(report)' in scanner and 'commit_publication(report)' in scanner and 'abort_publication(report' in scanner
+          print('Trust-first architecture OK')
           PY
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.14.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.15.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify Consolidated Engine modules
+      - name: Verify Trust & Publication Engine modules
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v140.py && test -f /app/scanner_v140.py && test -f /app/contracts_v140.py && test -f /app/semantics_v140.py && test -f /app/decision_v140.py && test -f /app/product_v140.py && test -f /app/selfcheck_v140.py && test -f /app/sharing_v140.py && test -f /app/finalize_v140.py && test -f /app/temporal_v140.py'
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v140,app_v140,scanner_v140,semantics_v140,decision_v140,product_v140,selfcheck_v140,sharing_v140,temporal_v140; assert contracts_v140.VERSION=='0.14.0'; print('0.14 packaged imports OK')"
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v150.py && test -f /app/scanner_v150.py && test -f /app/contracts_v150.py && test -f /app/semantics_v150.py && test -f /app/decision_v150.py && test -f /app/product_v150.py && test -f /app/selfcheck_v150.py && test -f /app/sharing_v150.py && test -f /app/finalize_v150.py && test -f /app/temporal_v150.py'
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v150,app_v150,scanner_v150,semantics_v150,decision_v150,product_v150,selfcheck_v150,sharing_v150,temporal_v150; assert contracts_v150.VERSION=='0.15.0'; print('0.15 packaged imports OK')"
 
-      - name: Smoke test policy overlap and operational lanes
+      - name: Smoke test contract ordering and compact Share V9
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from semantics_v140 import _pair_numeric_relation
-          from decision_v140 import _operational_lane,_operational_relevance
-          overlap=_pair_numeric_relation({'numeric':[{'entity_id':'sensor.water','above':98}]},{'numeric':[{'entity_id':'sensor.water','below':100}]})
-          assert not overlap['disjoint'] and overlap['overlaps'][0]['above']==98 and overlap['overlaps'][0]['below']==100
-          disjoint=_pair_numeric_relation({'numeric':[{'entity_id':'sensor.grid','above':650}]},{'numeric':[{'entity_id':'sensor.grid','below':-1000}]})
-          assert disjoint['disjoint']
-          item={'source_type':'registry_integration','source_id':'music_assistant','priority':'verify','dependency_impact':{'level':'none','impacted_automation_count':0}}
-          lane=_operational_lane(item)
-          assert lane=='watch' and _operational_relevance(item,lane)=='low'
-          print('Policy overlap and lane smoke OK')
+          from contracts_v150 import *
+          from product_v150 import _public_truth
+          from sharing_v150 import _inventory
+          r={'version':VERSION,'report_schema':{'version':REPORT_SCHEMA},'share_contract':{'schema':SHARE_SCHEMA,'model':SHARE_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'action_plan':{'model':ACTION_PLAN_MODEL,'items':[{'id':'x'}]},'controller_review_summary':{'model':CONTROLLER_REVIEW_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'temporal_analysis':{'model':TEMPORAL_MODEL,'history_policy':HISTORY_POLICY}}
+          truth=_public_truth(r,{'model':DECISION_MODEL,'total':1})
+          assert truth['share_schema_fresh'] and truth['share_model_fresh'] and truth['evaluated_after_contract_install']
+          compact=_inventory({'inventory_summary':{'states':1866,'domains':{'sensor':892},'unavailable_examples':['x']*20,'unavailable_count':192,'unknown_count':189}})
+          assert 'domains' not in compact and 'unavailable_examples' not in compact
+          print('Contract ordering and compact share smoke OK')
           PY
 
-      - name: Smoke test publication-aware history
+      - name: Smoke test event-aware numeric_state policy
+        run: |
+          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
+          from semantics_v150 import _trigger_metadata
+          m=_trigger_metadata({'trigger':[{'platform':'numeric_state','id':'full','entity_id':'sensor.water','above':98,'for':{'minutes':2}},{'platform':'time','id':'clock','at':'15:30:00'}]})
+          assert m['full']['crossing_semantics'] is True and m['clock']['crossing_semantics'] is False
+          assert m['full']['for']=={'minutes':2}
+          print('Event-aware trigger semantics smoke OK')
+          PY
+
+      - name: Smoke test publication transaction and revoke
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           import os,tempfile
           from temporal_v060 import save_history,load_history
-          from temporal_v140 import _snapshot_status,sync_publication_history,validate_current_publication_snapshot
-          from contracts_v140 import HISTORY_CONTRACT,ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL
-          assert _snapshot_status({'score_contract':HISTORY_CONTRACT,'final_primary_score':75,'publication_complete':False})['trusted'] is False
-          assert _snapshot_status({'score_contract':HISTORY_CONTRACT,'final_primary_score':75,'publication_complete':True})['trusted'] is True
+          from temporal_v150 import stage_publication,commit_publication,abort_publication,validate_current_snapshot
+          from contracts_v150 import ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL,HISTORY_CONTRACT
           f=tempfile.NamedTemporaryFile(delete=False); path=f.name; f.close(); os.unlink(path)
-          save_history([{'generated_at':'2026-08-11T07:00:00Z','active_ids':[]}],path)
-          r={'generated_at':'2026-08-11T07:00:00Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'fail'}}
-          sync_publication_history(r,history_path=path,publication_complete=False)
-          assert validate_current_publication_snapshot(r,history_path=path,require_published=False)['valid']
-          snap=load_history(path)[-1]
-          assert 'score_contract' not in snap and 'final_primary_score' not in snap and snap['publication_complete'] is False
+          save_history([{'generated_at':'2026-08-11T08:30:00Z','active_ids':[]}],path)
+          r={'generated_at':'2026-08-11T08:30:00Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'pass'}}
+          stage_publication(r,history_path=path); s=load_history(path)[-1]
+          assert s['publication_complete'] is False and 'score_contract' not in s
+          assert validate_current_snapshot(r,history_path=path,require_published=False)['valid']
+          commit_publication(r,history_path=path); s=load_history(path)[-1]
+          assert s['publication_complete'] is True and s['score_contract']==HISTORY_CONTRACT and s['final_primary_score']==75
+          abort_publication(r,history_path=path,reason='test_revoke'); s=load_history(path)[-1]
+          assert s['publication_complete'] is False and 'score_contract' not in s and 'final_primary_score' not in s
           os.unlink(path)
-          print('Publication-aware history smoke OK')
+          print('Publication transaction smoke OK')
           PY
 
-      - name: Runtime smoke test 0.14 API
+      - name: Runtime smoke test 0.15 API
         run: |
           set -euo pipefail
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v140.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v150.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.14.0"' /tmp/version.json
-          grep -q '"ha-doctor-share/8"' /tmp/version.json
-          grep -q '"decision_engine_v2_operational_lanes"' /tmp/version.json
-          grep -q '"condition_semantics_v9_branch_policy_overlap"' /tmp/version.json
-          grep -q '"publication_complete_required_v1"' /tmp/version.json
+          grep -q '"0.15.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/9"' /tmp/version.json
+          grep -q '"decision_engine_v3_execution_board"' /tmp/version.json
+          grep -q '"condition_semantics_v10_event_window_policy"' /tmp/version.json
+          grep -q '"publication_transaction_v1"' /tmp/version.json
