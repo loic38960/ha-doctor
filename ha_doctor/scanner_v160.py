@@ -18,6 +18,7 @@ from temporal_v160 import (
 from product_v160 import apply_product_intelligence_v8, install_public_contract_v160
 from selfcheck_v160 import run_self_check_v8, post_commit_validation_v8
 from finalize_v160 import finalize_release_v8
+from hotfix_v161 import apply_hotfix_v161
 from contracts_v160 import (
     VERSION, REPORT_SCHEMA, HISTORY_CONTRACT, HISTORY_POLICY, PUBLICATION_MODEL,
     DECISION_MODEL, CONDITION_MODEL, CONTROLLER_IMPACT_MODEL, RESILIENCE_MODEL,
@@ -77,6 +78,7 @@ def scan(include_yaml=True):
     install_public_contract_v160(report)
     t0 = time.monotonic(); apply_product_intelligence_v8(report); phases["precision_product_and_decision"] = round(time.monotonic() - t0, 4)
     install_public_contract_v160(report)
+    t0 = time.monotonic(); apply_hotfix_v161(report); phases["publication_contract_hotfix"] = round(time.monotonic() - t0, 4)
 
     t0 = time.monotonic(); stage = stage_publication(report); phases["publication_stage"] = round(time.monotonic() - t0, 4)
     report.setdefault("score_history_integrity", {})["publication_stage"] = stage
@@ -123,12 +125,13 @@ def scan(include_yaml=True):
         "publication_transaction_validated_during_scan": True, "canonical_order_validated_during_scan": True,
     })
     report.setdefault("diagnostic_engine", {}).update({
-        "version": "evidence_precision_engine_0_16", "condition_semantics_v11": True,
+        "version": "evidence_precision_engine_0_16_1", "condition_semantics_v11": True,
         "controller_impact_model": CONTROLLER_IMPACT_MODEL, "resilience_precision_model": RESILIENCE_MODEL,
         "decision_engine_v4": True, "automation_precision_v1": True, "self_check_v8_precision": True,
         "temporal_v7_baseline_visibility": True, "history_contract": HISTORY_CONTRACT,
         "history_policy": HISTORY_POLICY, "publication_model": PUBLICATION_MODEL,
         "decision_model": DECISION_MODEL, "condition_model": CONDITION_MODEL,
+        "v161_publication_hotfix": True,
         "additional_home_assistant_state_reads": 0, "automatic_fix": False, "read_only": True,
     })
     return report
