@@ -13,6 +13,7 @@ from resilience_v100 import build_resilience_recommendations_v3
 from semantics_v140 import refine_condition_semantics_v9
 from temporal_v140 import apply_temporal_truth_v5, sync_publication_history, validate_current_publication_snapshot
 from product_v140 import apply_product_intelligence_v6
+from trace_v140 import build_controller_trace_v9
 from selfcheck_v140 import run_self_check_v6
 from finalize_v140 import finalize_release_v6
 from contracts_v140 import VERSION, REPORT_SCHEMA, HISTORY_CONTRACT, HISTORY_POLICY, DECISION_MODEL, CONDITION_MODEL
@@ -73,7 +74,7 @@ def scan(include_yaml=True):
     report.setdefault("report_schema", {})["version"] = REPORT_SCHEMA
 
     t0 = time.monotonic(); apply_temporal_truth_v5(report); phases["publication_aware_temporal"] = round(time.monotonic() - t0, 4)
-    t0 = time.monotonic(); apply_product_intelligence_v6(report); phases["decision_product_layer"] = round(time.monotonic() - t0, 4)
+    t0 = time.monotonic(); apply_product_intelligence_v6(report); build_controller_trace_v9(report); phases["decision_product_layer"] = round(time.monotonic() - t0, 4)
 
     report["scan_performance"] = {
         "model": "scan_performance_v5_consolidated_pipeline", "phases": dict(phases),
@@ -89,7 +90,8 @@ def scan(include_yaml=True):
     })
     report.setdefault("diagnostic_engine", {}).update({
         "version": "consolidated_decision_engine_0_14", "consolidated_pipeline_v1": True,
-        "condition_semantics_v9": True, "decision_engine_v2": True, "repair_playbooks_v2": True,
+        "condition_semantics_v9": True, "controller_review_trace_v2": True,
+        "decision_engine_v2": True, "repair_playbooks_v2": True,
         "entity_attention_v3": True, "product_intelligence_v6": True, "self_check_v6_native": True,
         "temporal_v5_publication_aware": True, "history_contract": HISTORY_CONTRACT, "history_policy": HISTORY_POLICY,
         "decision_model": DECISION_MODEL, "condition_model": CONDITION_MODEL,
