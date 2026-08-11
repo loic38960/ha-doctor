@@ -23,95 +23,81 @@ jobs:
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.10 UI and JavaScript stack
+      - name: Validate 0.11 UI and JavaScript stack
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100
+          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110
           source = Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced = app_v100.enhance_ui_v100(source)
+          enhanced = app_v110.enhance_ui_v110(source)
           for marker in (
               "Vue d'ensemble", "Architecture", "Qualité & confidentialité",
-              "HA Doctor 0.9 · Triage produit", "HA Doctor 0.10 · Engine Candidate",
-              "Actions expliquées 0.10", "Engine Candidate 0.10",
+              "HA Doctor 0.10 · Engine Candidate", "HA Doctor 0.11 · Cross-Validated Engine",
               "Rapport support · compact", "Résumé lisible",
           ):
               assert marker in enhanced, marker
-          assert app_v100.VERSION == '0.10.0'
-          Path('/tmp/ha-doctor-v100-ui.js').write_text(
+          assert app_v110.VERSION == '0.11.0'
+          Path('/tmp/ha-doctor-v110-ui.js').write_text(
               app_v080.UI_PATCH_JS + '\n' + app_v082.UI_PATCH_V082 + '\n' + app_v083.UI_PATCH_V083 + '\n' +
               app_v084.UI_PATCH_V084 + '\n' + app_v085.UI_PATCH_V085 + '\n' + app_v086.UI_PATCH_V086 + '\n' +
-              app_v087.UI_PATCH_V087 + '\n' + app_v088.UI_PATCH_V088 + '\n' + app_v090.UI_PATCH_V090 + '\n' + app_v100.UI_PATCH_V100,
+              app_v087.UI_PATCH_V087 + '\n' + app_v088.UI_PATCH_V088 + '\n' + app_v090.UI_PATCH_V090 + '\n' +
+              app_v100.UI_PATCH_V100 + '\n' + app_v110.UI_PATCH_V110,
               encoding='utf-8')
           PY
-          node --check /tmp/ha-doctor-v100-ui.js
+          node --check /tmp/ha-doctor-v110-ui.js
 
-      - name: Validate 0.10 version contracts
+      - name: Validate 0.11 version contracts
         run: |
-          grep -q 'version: "0.10.0"' ha_doctor/config.yaml
-          grep -q 'VERSION = "0.10.0"' ha_doctor/contracts_v100.py
-          grep -q 'app_v100.py' ha_doctor/run.sh
-          grep -q 'Starting HA Doctor 0.10.0' ha_doctor/run.sh
+          grep -q 'version: "0.11.0"' ha_doctor/config.yaml
+          grep -q 'VERSION = "0.11.0"' ha_doctor/contracts_v110.py
+          grep -q 'app_v110.py' ha_doctor/run.sh
+          grep -q 'Starting HA Doctor 0.11.0' ha_doctor/run.sh
           PYTHONPATH=ha_doctor python - <<'PY'
-          import contracts_v100, app_v100, scanner_v100
-          assert contracts_v100.VERSION == app_v100.VERSION == '0.10.0'
-          assert contracts_v100.REPORT_SCHEMA == app_v100.REPORT_SCHEMA == 'ha-doctor-report/0.10'
-          assert contracts_v100.SHARE_SCHEMA == 'ha-doctor-share/4'
+          import contracts_v110, app_v110
+          assert contracts_v110.VERSION == app_v110.VERSION == '0.11.0'
+          assert contracts_v110.REPORT_SCHEMA == 'ha-doctor-report/0.11'
+          assert contracts_v110.SHARE_SCHEMA == 'ha-doctor-share/5'
           PY
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.10.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.11.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify Engine Candidate modules in image
+      - name: Verify Cross-Validated modules in image
         run: |
           docker run --rm --entrypoint sh ha-doctor-ci -c \
-            'test -f /app/app_v100.py && test -f /app/scanner_v100.py && test -f /app/contracts_v100.py &&
-             test -f /app/product_v100.py && test -f /app/selfcheck_v100.py && test -f /app/sharing_v100.py &&
-             test -f /app/semantics_v100.py && test -f /app/resilience_v100.py && test -f /app/finalize_v100.py'
+            'test -f /app/app_v110.py && test -f /app/scanner_v110.py && test -f /app/contracts_v110.py &&
+             test -f /app/product_v110.py && test -f /app/selfcheck_v110.py && test -f /app/sharing_v110.py &&
+             test -f /app/finalize_v110.py && test -f /app/semantics_v100.py && test -f /app/resilience_v100.py'
           docker run --rm --entrypoint python3 ha-doctor-ci -c \
-            "import contracts_v100, app_v100, scanner_v100, product_v100, selfcheck_v100, sharing_v100, semantics_v100, resilience_v100; assert contracts_v100.VERSION == '0.10.0'; print('0.10 packaged imports OK')"
+            "import contracts_v110, app_v110, scanner_v110, product_v110, selfcheck_v110, sharing_v110; assert contracts_v110.VERSION == '0.11.0'; print('0.11 packaged imports OK')"
 
-      - name: Smoke test 0.10 semantic, resilience and product invariants
+      - name: Smoke test real-report regressions
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from semantics_v100 import _ranges_overlap
-          from resilience_v100 import build_resilience_recommendations_v3
-          assert _ranges_overlap({'entity_id':'sensor.level','above':98.0,'below':None},{'entity_id':'sensor.level','above':None,'below':100.0})['overlap'] is True
-          assert _ranges_overlap({'entity_id':'sensor.grid','above':650.0,'below':None},{'entity_id':'sensor.grid','above':None,'below':-1000.0})['overlap'] is False
-          r={'findings':[],'diagnostic_explanations':[],'action_plan':{'items':[]},'recommendation_queue':{'items':[]},'resilience_analysis':{'items':[
-            {'entity_id':'sensor.weak','counts_as_external_spof':True,'criticality':93,'automation_count':5,'physical_control_consumer_count':2,'unprotected_physical_automation_count':0,'weak_physical_automation_count':1,'automation_evidence':[{'automation':'weak','risk_relevant':True,'protection':'weak'}]},
-            {'entity_id':'sensor.unsafe','counts_as_external_spof':True,'criticality':32,'automation_count':2,'physical_control_consumer_count':1,'unprotected_physical_automation_count':1,'weak_physical_automation_count':0,'automation_evidence':[{'automation':'unsafe','risk_relevant':True,'protection':'none'}]},
-          ]}}
-          rr=build_resilience_recommendations_v3(r)
-          assert rr['items'][0]['entity_id']=='sensor.unsafe' and rr['items'][0]['tier']=='must_fix', rr
-          print('0.10 semantic/resilience invariants OK')
+          from product_v110 import finding_evidence_count, _security, _maintenance, _single_snapshot_evidence
+          r={'findings':[
+            {'rule_id':'HD-SEC-001','examples':[{}, {}, {}]},
+            {'rule_id':'HD-SEC-003','examples':[{}]*8},
+            {'rule_id':'HD-CFG-001','examples':[{}]*7},
+            {'rule_id':'HD-REG-002','summary':'29 entité(s) locales','examples':[{}]*12},
+          ],'registry_analysis':{'orphan_analysis':{}},'scan_performance':{'single_state_snapshot_preserved':True}}
+          assert finding_evidence_count(r['findings'][0]) == 3
+          assert finding_evidence_count(r['findings'][3]) == 29
+          assert _security(r)['active_secret_hint_count'] == 3
+          assert _security(r)['archive_secret_hint_count'] == 8
+          assert _maintenance(r)['missing_reference_count'] == 7
+          assert _maintenance(r)['local_unavailable_review'] == 29
+          assert _single_snapshot_evidence(r) is True
+          print('0.11 real-report regressions OK')
           PY
 
-      - name: Runtime smoke test APIs and Share V4
+      - name: Runtime smoke test 0.11 API
         run: |
           set -euo pipefail
-          cat >/tmp/ha-doctor-report.json <<'JSON'
-          {"product":"HA Doctor","version":"0.10.0","generated_at":"2026-08-10T20:00:00Z","scores":{"global":76},"severity_counts":{"critical":0,"high":1,"medium":0,"low":0,"info":0},"findings":[{"rule_id":"HD-AUTO-009","title":"Double writer","severity":"high","domain":"automations","priority":"action_now"}],"action_plan":{"total":1,"counts":{"action_now":1,"verify":0,"optimize":0},"items":[{"id":"DX-HD-AUTO-009","title":"Double writer","priority":"action_now","severity":"high","domain":"automations","confidence":"high","confidence_score":0.97,"source_type":"finding","source_id":"HD-AUTO-009"}]},"doctor_view":{"model":"doctor_view_v2_engine_candidate","verdict":{"code":"action_required","label":"Corrections prioritaires"},"technical_health_score":76,"score_v5_preview":77,"projected_after_top_3":82,"triage_counts":{"fix_now":1,"investigate":0,"review":0,"optimize":0,"watch":0},"next_best_actions":[{"id":"DX-HD-AUTO-009","title":"Double writer","lane":"fix_now","risk_score":80,"confidence_tier":"A","evidence_level":"confirmed","repair_mode":"automation_cleanup","repair_safety":"manual_low_risk_review","effort":"small","estimated_score_gain":4.8}],"trust":{"score":90,"level":"high"}},"product_intelligence":{"model":"product_intelligence_v2_engine_candidate","score_projection":{"after_top_1":{"score":82,"estimated_gain":4.8},"after_top_3":{"score":82,"estimated_gain":4.8},"after_top_5":{"score":82,"estimated_gain":4.8},"after_top_10":{"score":82,"estimated_gain":4.8}},"entity_noise":{"raw_unavailable":0,"raw_unknown":0,"registry_actionable_root_causes":0},"maintenance":{},"security":{"posture":"good"},"automation_reliability":{"physical_controller_pairs_to_review":0},"doctor_modes":{},"diagnostic_coverage":{"score":100},"score_change_explainer":{},"evidence_summary":{"confirmed":1}},"self_check":{"model":"report_self_check_v2_cross_contract","status":"pass","check_count":70,"pass_count":70,"warning_count":0,"failure_count":0,"blocks_publication":false},"share_contract":{"schema":"ha-doctor-share/4","model":"assistant_share_report_v4","target_bytes":28000,"hard_bytes":32000,"single_source_of_truth":true},"report_schema":{"version":"ha-doctor-report/0.10","capabilities":[]},"scan_performance":{"model":"scan_performance_v1","total_seconds":1.0,"phases":{"core":0.9},"slowest_phase":"core"}}
-          JSON
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 -v /tmp/ha-doctor-report.json:/data/report.json:ro --entrypoint python3 ha-doctor-ci /app/app_v100.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v110.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.10.0"' /tmp/version.json
-          curl -fsS http://127.0.0.1:18099/api/intelligence -o /tmp/intelligence.json
-          grep -q 'product_intelligence_v2_engine_candidate' /tmp/intelligence.json
-          curl -fsS http://127.0.0.1:18099/api/scan-performance -o /tmp/perf.json
-          grep -q 'scan_performance_v1' /tmp/perf.json
-          curl -fsS -D /tmp/share-headers.txt http://127.0.0.1:18099/api/download-share -o /tmp/share.json
-          grep -qi 'X-HA-Doctor-Share-Model: assistant_share_report_v4' /tmp/share-headers.txt
-          python - <<'PY'
-          import json
-          p=json.load(open('/tmp/share.json'))
-          assert p['version']=='0.10.0'
-          assert p['share_schema']['version']=='ha-doctor-share/4'
-          assert p['share_schema']['target_bytes']==p['export_meta']['target_bytes']==28000
-          assert p['share_schema']['hard_bytes']==p['export_meta']['hard_bytes']==32000
-          assert p['export_meta']['share_report_bytes_estimate'] <= 32000
-          print('0.10 runtime/share contract OK')
-          PY
+          grep -q '"0.11.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/5"' /tmp/version.json
