@@ -1,5 +1,5 @@
 name: "HA Doctor"
-version: "0.16.0"
+version: "0.16.1"
 slug: "ha_doctor"
 description: "Contrôle technique local, décisionnel, explicatif, précis, temporellement fiable et strictement en lecture seule de votre installation Home Assistant"
 arch:
