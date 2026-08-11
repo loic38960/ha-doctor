@@ -1,12 +1,31 @@
 """HA Doctor 0.17 actionable resilience evidence.
 
 Builds on phase-aware V5 and turns each dependency finding into a concrete guard
-strategy without editing Home Assistant or inventing behavior. The strategy is
-advisory and keeps must-fix vs hardening distinct.
+strategy without editing Home Assistant or inventing behavior. V6 natively
+separates unprotected pre-control exposure from weak fallback hardening, so it
+does not depend on the 0.16.1 publication hotfix.
 """
 
 from resilience_v160 import refine_resilience_v5
 from contracts_v170 import RESILIENCE_MODEL, RESILIENCE_RECOMMENDATION_MODEL
+
+_PRE_CONTROL_PHASES = {"pre_control_decision", "mixed_feedback_control", "unresolved_reference_phase"}
+
+
+def _normalize_pre_control(row):
+    evidence = [x for x in row.get("phase_evidence") or [] if isinstance(x, dict)]
+    unprotected = sum(1 for x in evidence if x.get("phase") in _PRE_CONTROL_PHASES and str(x.get("protection") or "") == "none")
+    weak = sum(1 for x in evidence if x.get("phase") in _PRE_CONTROL_PHASES and str(x.get("protection") or "") == "weak")
+    row["pre_control_risk_count"] = unprotected
+    row["unprotected_pre_control_risk_count"] = unprotected
+    row["weak_pre_control_risk_count"] = weak
+    if unprotected > 0:
+        row["tier"] = "must_fix"
+        row["phase_adjustment"] = "unprotected_pre_control_dependency_confirmed"
+    elif weak > 0:
+        row["tier"] = "hardening"
+        row["phase_adjustment"] = "weak_pre_control_dependency_hardening"
+    return row
 
 
 def _guard_strategy(row):
@@ -39,11 +58,12 @@ def refine_resilience_v6(report):
     for raw in base.get("items") or []:
         if not isinstance(raw, dict):
             continue
-        row = dict(raw)
+        row = _normalize_pre_control(dict(raw))
         row["guard_strategy"] = _guard_strategy(row)
         row["resolution_status"] = "logic_review_required" if row.get("tier") == "must_fix" else "optimization"
         row["static_phase_proof"] = {
-            "pre_control_risk_count": int(row.get("pre_control_risk_count", 0) or 0),
+            "unprotected_pre_control_risk_count": int(row.get("unprotected_pre_control_risk_count", 0) or 0),
+            "weak_pre_control_risk_count": int(row.get("weak_pre_control_risk_count", 0) or 0),
             "post_action_confirmation_count": int(row.get("post_action_confirmation_count", 0) or 0),
             "trigger_dependency_count": int(row.get("trigger_dependency_count", 0) or 0),
             "phase_adjustment": row.get("phase_adjustment"),
@@ -57,6 +77,7 @@ def refine_resilience_v6(report):
         "must_fix_count": sum(1 for x in items if x.get("tier") == "must_fix"),
         "hardening_count": sum(1 for x in items if x.get("tier") == "hardening"),
         "guard_strategy_count": len(items),
+        "selection_policy": "unprotected_pre_control_before_weak_fallback_hardening",
         "automatic_fix": False,
         "read_only": True,
     }
@@ -65,5 +86,6 @@ def refine_resilience_v6(report):
     precision["model"] = RESILIENCE_MODEL
     precision["guard_strategy_count"] = len(items)
     precision["must_fix_entities"] = [x.get("entity_id") for x in items if x.get("tier") == "must_fix"]
+    precision["weak_hardening_entities"] = [x.get("entity_id") for x in items if x.get("tier") == "hardening" and int(x.get("weak_pre_control_risk_count",0) or 0)>0]
     report["resilience_precision"] = precision
     return result
