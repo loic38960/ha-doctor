@@ -20,106 +20,127 @@ jobs:
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.15 UI and contracts
+      - name: Validate 0.16 UI and contracts
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, app_v140, app_v150, contracts_v150
+          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, app_v130, app_v140, app_v150, app_v160, contracts_v160
           source=Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced=app_v150.enhance_ui_v150(source)
-          assert 'HA Doctor 0.15 · Trust & Publication Engine' in enhanced
-          assert app_v150.VERSION == contracts_v150.VERSION == '0.15.0'
-          assert contracts_v150.REPORT_SCHEMA == 'ha-doctor-report/0.15'
-          assert contracts_v150.SHARE_SCHEMA == 'ha-doctor-share/9'
-          assert contracts_v150.SHARE_TARGET_BYTES == 22000
-          assert contracts_v150.DECISION_MODEL == 'decision_engine_v3_execution_board'
-          assert contracts_v150.CONDITION_MODEL == 'condition_semantics_v10_event_window_policy'
-          assert contracts_v150.PUBLICATION_MODEL == 'publication_transaction_v1'
-          Path('/tmp/ha-doctor-v150-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130+'\n'+app_v140.UI_PATCH_V140+'\n'+app_v150.UI_PATCH_V150,encoding='utf-8')
+          enhanced=app_v160.enhance_ui_v160(source)
+          assert 'HA Doctor 0.16 · Evidence Precision Engine' in enhanced
+          assert app_v160.VERSION == contracts_v160.VERSION == '0.16.0'
+          assert contracts_v160.REPORT_SCHEMA == 'ha-doctor-report/0.16'
+          assert contracts_v160.SHARE_SCHEMA == 'ha-doctor-share/10'
+          assert contracts_v160.SHARE_TARGET_BYTES == 20000
+          assert contracts_v160.SHARE_HARD_BYTES == 24000
+          assert contracts_v160.DECISION_MODEL == 'decision_engine_v4_precision_board'
+          assert contracts_v160.CONDITION_MODEL == 'condition_semantics_v11_evidence_precision'
+          assert contracts_v160.CONTROLLER_IMPACT_MODEL == 'controller_impact_v2_unresolved_scope'
+          assert contracts_v160.RESILIENCE_MODEL == 'resilience_precision_v5_phase_aware'
+          Path('/tmp/ha-doctor-v160-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120+'\n'+app_v130.UI_PATCH_V130+'\n'+app_v140.UI_PATCH_V140+'\n'+app_v150.UI_PATCH_V150+'\n'+app_v160.UI_PATCH_V160,encoding='utf-8')
           PY
-          node --check /tmp/ha-doctor-v150-ui.js
-          grep -q 'version: "0.15.0"' ha_doctor/config.yaml
-          grep -q 'app_v150.py' ha_doctor/run.sh
-          grep -q 'Starting HA Doctor 0.15.0' ha_doctor/run.sh
+          node --check /tmp/ha-doctor-v160-ui.js
+          grep -q 'version: "0.16.0"' ha_doctor/config.yaml
+          grep -q 'app_v160.py' ha_doctor/run.sh
+          grep -q 'Starting HA Doctor 0.16.0' ha_doctor/run.sh
 
-      - name: Enforce trust-first pipeline architecture
+      - name: Enforce precision pipeline architecture
         run: |
           python - <<'PY'
           from pathlib import Path
-          scanner=Path('ha_doctor/scanner_v150.py').read_text()
-          product=Path('ha_doctor/product_v150.py').read_text()
-          selfcheck=Path('ha_doctor/selfcheck_v150.py').read_text()
-          assert 'scanner_v120' not in scanner and 'scanner_v130' not in scanner and 'scanner_v140' not in scanner
-          assert scanner.index('"single_state_snapshot_preserved": True') < scanner.index('apply_product_intelligence_v7(report)')
-          assert product.index('install_public_contract(report)') < product.index('_public_truth(report, decision)')
-          assert 'legacy_report_rewriting' in selfcheck and 'final_export_self_validated' in selfcheck
-          assert 'stage_publication(report)' in scanner and 'commit_publication(report)' in scanner and 'abort_publication(report' in scanner
-          print('Trust-first architecture OK')
+          scanner=Path('ha_doctor/scanner_v160.py').read_text()
+          decision=Path('ha_doctor/decision_v160.py').read_text()
+          selfcheck=Path('ha_doctor/selfcheck_v160.py').read_text()
+          temporal=Path('ha_doctor/temporal_v160.py').read_text()
+          assert 'scanner_v150' not in scanner
+          assert scanner.index('"single_state_snapshot_preserved": True') < scanner.index('apply_product_intelligence_v8(report)')
+          assert 'refine_condition_semantics_v11' in scanner and 'refine_resilience_v5' in scanner
+          assert 'canonical_order_key' in decision and 'broad_historical_blast_radius_not_used_for_priority' in decision
+          assert 'controller.exact_automation_count' in selfcheck and 'order.action_identity' in selfcheck
+          assert 'report_version": VERSION' in temporal and 'current_committed_baseline' in temporal
+          assert 'additional_home_assistant_state_reads": 0' in scanner
+          print('Precision architecture OK')
           PY
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.15.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.16.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify Trust & Publication Engine modules
+      - name: Verify Evidence Precision modules
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v150.py && test -f /app/scanner_v150.py && test -f /app/contracts_v150.py && test -f /app/semantics_v150.py && test -f /app/decision_v150.py && test -f /app/product_v150.py && test -f /app/selfcheck_v150.py && test -f /app/sharing_v150.py && test -f /app/finalize_v150.py && test -f /app/temporal_v150.py'
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v150,app_v150,scanner_v150,semantics_v150,decision_v150,product_v150,selfcheck_v150,sharing_v150,temporal_v150; assert contracts_v150.VERSION=='0.15.0'; print('0.15 packaged imports OK')"
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v160.py && test -f /app/scanner_v160.py && test -f /app/contracts_v160.py && test -f /app/semantics_v160.py && test -f /app/resilience_v160.py && test -f /app/automation_precision_v160.py && test -f /app/decision_v160.py && test -f /app/product_v160.py && test -f /app/selfcheck_v160.py && test -f /app/sharing_v160.py && test -f /app/finalize_v160.py && test -f /app/temporal_v160.py'
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v160,app_v160,scanner_v160,semantics_v160,resilience_v160,automation_precision_v160,decision_v160,product_v160,selfcheck_v160,sharing_v160,temporal_v160; assert contracts_v160.VERSION=='0.16.0'; print('0.16 packaged imports OK')"
 
-      - name: Smoke test contract ordering and compact Share V9
-        run: |
-          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from contracts_v150 import *
-          from product_v150 import _public_truth
-          from sharing_v150 import _inventory
-          r={'version':VERSION,'report_schema':{'version':REPORT_SCHEMA},'share_contract':{'schema':SHARE_SCHEMA,'model':SHARE_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'action_plan':{'model':ACTION_PLAN_MODEL,'items':[{'id':'x'}]},'controller_review_summary':{'model':CONTROLLER_REVIEW_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'temporal_analysis':{'model':TEMPORAL_MODEL,'history_policy':HISTORY_POLICY}}
-          truth=_public_truth(r,{'model':DECISION_MODEL,'total':1})
-          assert truth['share_schema_fresh'] and truth['share_model_fresh'] and truth['evaluated_after_contract_install']
-          compact=_inventory({'inventory_summary':{'states':1866,'domains':{'sensor':892},'unavailable_examples':['x']*20,'unavailable_count':192,'unknown_count':189}})
-          assert 'domains' not in compact and 'unavailable_examples' not in compact
-          print('Contract ordering and compact share smoke OK')
-          PY
-
-      - name: Smoke test event-aware numeric_state policy
+      - name: Smoke test exact controller scope
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from semantics_v150 import _trigger_metadata
-          m=_trigger_metadata({'trigger':[{'platform':'numeric_state','id':'full','entity_id':'sensor.water','above':98,'for':{'minutes':2}},{'platform':'time','id':'clock','at':'15:30:00'}]})
-          assert m['full']['crossing_semantics'] is True and m['clock']['crossing_semantics'] is False
-          assert m['full']['for']=={'minutes':2}
-          print('Event-aware trigger semantics smoke OK')
+          from semantics_v160 import build_controller_impact_v2
+          sem={'unproven_pairs':[{'entity_id':'switch.boost','automations':['Solar','Low'],'target_kind':'actuator'},{'entity_id':'input_boolean.guard','automations':['Solar','Release'],'target_kind':'helper'}]}
+          x=build_controller_impact_v2(sem)
+          assert x['physical_pair_count']==1 and x['impacted_automation_count']==2
+          assert x['impacted_automations']==['Low','Solar']
+          assert x['broad_historical_blast_radius_not_used_for_priority'] is True
+          print('Exact controller scope smoke OK')
           PY
 
-      - name: Smoke test publication transaction and revoke
+      - name: Smoke test phase-aware resilience and automation precision
+        run: |
+          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
+          from resilience_v160 import classify_dependency_phase
+          from automation_precision_v160 import _scan_duplicate_sequence,_feedback_class
+          pre={'conditions':[{'condition':'template','value_template':"{{ states('sensor.power')|float(0)>10 }}"}],'actions':[{'action':'switch.turn_on','target':{'entity_id':'switch.pump'}}]}
+          post={'actions':[{'action':'switch.turn_on','target':{'entity_id':'switch.pump'}},{'condition':'template','value_template':"{{ states('sensor.power')|float(0)>10 }}"}]}
+          assert classify_dependency_phase(pre,'sensor.power')['phase']=='pre_control_decision'
+          assert classify_dependency_phase(post,'sensor.power')['phase']=='post_action_confirmation'
+          a={'action':'notify.mobile_app_phone','data':{'message':'x'}}
+          dup=_scan_duplicate_sequence([a,dict(a)],'A')
+          assert dup and dup[0]['classification']=='side_effect_duplicate' and dup[0]['automatic_removal_safe'] is False
+          assert _feedback_class({'state:on'},{'state:on'})[0]=='state_reassertion_feedback'
+          assert _feedback_class({'state:on'},{'state:off'})[0]=='state_transition_feedback'
+          print('Phase-aware and automation precision smoke OK')
+          PY
+
+      - name: Smoke test 0.16 publication identity and baseline visibility
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           import os,tempfile
           from temporal_v060 import save_history,load_history
-          from temporal_v150 import stage_publication,commit_publication,abort_publication,validate_current_snapshot
-          from contracts_v150 import ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL,HISTORY_CONTRACT
+          from temporal_v160 import stage_publication,commit_publication,validate_current_snapshot,refresh_published_baseline_visibility
+          from contracts_v160 import VERSION,REPORT_SCHEMA,ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL,HISTORY_CONTRACT
           f=tempfile.NamedTemporaryFile(delete=False); path=f.name; f.close(); os.unlink(path)
-          save_history([{'generated_at':'2026-08-11T08:30:00Z','active_ids':[]}],path)
-          r={'generated_at':'2026-08-11T08:30:00Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'pass'}}
-          stage_publication(r,history_path=path); s=load_history(path)[-1]
-          assert s['publication_complete'] is False and 'score_contract' not in s
-          assert validate_current_snapshot(r,history_path=path,require_published=False)['valid']
-          commit_publication(r,history_path=path); s=load_history(path)[-1]
-          assert s['publication_complete'] is True and s['score_contract']==HISTORY_CONTRACT and s['final_primary_score']==75
-          abort_publication(r,history_path=path,reason='test_revoke'); s=load_history(path)[-1]
-          assert s['publication_complete'] is False and 'score_contract' not in s and 'final_primary_score' not in s
+          save_history([{'generated_at':'2026-08-11T09:00:00Z','active_ids':[]}],path)
+          r={'generated_at':'2026-08-11T09:00:00Z','scores':{'global':76},'score_v5_preview':{'v5_preview_score':77},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'pass'}}
+          stage_publication(r,path); assert validate_current_snapshot(r,path,require_published=False)['valid']
+          commit_publication(r,path); assert validate_current_snapshot(r,path,require_published=True)['valid']
+          vis=refresh_published_baseline_visibility(r,path); snap=load_history(path)[-1]
+          assert vis['current_committed_baseline'] and snap['report_version']==VERSION and snap['report_schema']==REPORT_SCHEMA
+          assert snap['score_contract']==HISTORY_CONTRACT and snap['final_primary_score']==76
           os.unlink(path)
-          print('Publication transaction smoke OK')
+          print('0.16 publication identity smoke OK')
           PY
 
-      - name: Runtime smoke test 0.15 API
+      - name: Smoke test Share V10 budget and canonical order
+        run: |
+          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
+          from sharing_v160 import build_share_report
+          from contracts_v160 import *
+          actions=[{'id':f'A{i}','title':f'Action {i}','priority':'verify','severity':'low','domain':'test','confidence':'high','source_type':'finding','source_id':f'F{i%15}','operational_lane':'logic_review','operational_relevance':'medium','execution_priority_score':50,'dependency_impact':{'level':'low','impacted_automation_count':0}} for i in range(16)]
+          r={'generated_at':'2026-08-11T09:00:00Z','scores':{'global':76},'findings':[{'rule_id':f'F{i}','title':f'F{i}','severity':'low','domain':'test','priority':'verify'} for i in range(15)],'action_plan':{'model':ACTION_PLAN_MODEL,'total':16,'items':actions},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'condition_semantics':{'model':CONDITION_MODEL,'unproven_pairs':[]},'controller_impact':{'model':CONTROLLER_IMPACT_MODEL},'resilience_recommendations':{'model':RESILIENCE_RECOMMENDATION_MODEL,'analysis_model':RESILIENCE_MODEL,'items':[]},'duplicate_action_semantics':{'model':DUPLICATE_MODEL,'count':0,'items':[]},'automation_feedback_semantics':{'model':LOOP_MODEL,'count':0,'items':[]},'decision_engine':{'model':DECISION_MODEL,'total':16,'primary_action_count':16,'lane_counts':{'logic_review':16},'canonical_order':{'model':CANONICAL_ORDER_MODEL,'item_ids':[f'A{i}' for i in range(16)]},'top':[]},'temporal_analysis':{'model':TEMPORAL_MODEL,'history_contract':HISTORY_CONTRACT,'history_policy':HISTORY_POLICY,'publication_model':PUBLICATION_MODEL},'product_intelligence':{'model':'x'},'doctor_view':{'model':PRODUCT_MODEL,'trust':{}},'quality_gates':{},'self_check':{'status':'pass'},'report_schema':{'version':REPORT_SCHEMA,'capabilities':[]}}
+          s=build_share_report(r); m=s['export_meta']
+          assert s['share_schema']['version']==SHARE_SCHEMA and m['exported_action_count']==16 and m['exported_finding_count']==15
+          assert m['within_hard_bytes'] and m['canonical_order_preserved'] and m['controller_exact_scope_preserved']
+          print('Share V10 smoke OK',m['share_report_bytes_estimate'])
+          PY
+
+      - name: Runtime smoke test 0.16 API
         run: |
           set -euo pipefail
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v150.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v160.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.15.0"' /tmp/version.json
-          grep -q '"ha-doctor-share/9"' /tmp/version.json
-          grep -q '"decision_engine_v3_execution_board"' /tmp/version.json
-          grep -q '"condition_semantics_v10_event_window_policy"' /tmp/version.json
-          grep -q '"publication_transaction_v1"' /tmp/version.json
+          grep -q '"0.16.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/10"' /tmp/version.json
+          grep -q '"decision_engine_v4_precision_board"' /tmp/version.json
+          grep -q '"condition_semantics_v11_evidence_precision"' /tmp/version.json
+          grep -q '"controller_impact_v2_unresolved_scope"' /tmp/version.json
