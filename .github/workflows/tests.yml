@@ -13,91 +13,78 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pyyaml websocket-client
-
       - name: Run complete unit test suite
         run: python -m unittest discover -s tests -v
-
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.11 UI and JavaScript stack
+      - name: Validate 0.12 UI and contracts
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110
-          source = Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced = app_v110.enhance_ui_v110(source)
-          for marker in (
-              "Vue d'ensemble", "Architecture", "Qualité & confidentialité",
-              "HA Doctor 0.10 · Engine Candidate", "HA Doctor 0.11 · Cross-Validated Engine",
-              "Rapport support · compact", "Résumé lisible",
-          ):
-              assert marker in enhanced, marker
-          assert app_v110.VERSION == '0.11.0'
-          Path('/tmp/ha-doctor-v110-ui.js').write_text(
-              app_v080.UI_PATCH_JS + '\n' + app_v082.UI_PATCH_V082 + '\n' + app_v083.UI_PATCH_V083 + '\n' +
-              app_v084.UI_PATCH_V084 + '\n' + app_v085.UI_PATCH_V085 + '\n' + app_v086.UI_PATCH_V086 + '\n' +
-              app_v087.UI_PATCH_V087 + '\n' + app_v088.UI_PATCH_V088 + '\n' + app_v090.UI_PATCH_V090 + '\n' +
-              app_v100.UI_PATCH_V100 + '\n' + app_v110.UI_PATCH_V110,
-              encoding='utf-8')
+          import app_v080, app_v082, app_v083, app_v084, app_v085, app_v086, app_v087, app_v088, app_v090, app_v100, app_v110, app_v120, contracts_v120
+          source=Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
+          enhanced=app_v120.enhance_ui_v120(source)
+          assert 'HA Doctor 0.12 · Temporal Truth Engine' in enhanced
+          assert app_v120.VERSION == contracts_v120.VERSION == '0.12.0'
+          assert contracts_v120.REPORT_SCHEMA == 'ha-doctor-report/0.12'
+          assert contracts_v120.SHARE_SCHEMA == 'ha-doctor-share/6'
+          assert contracts_v120.HISTORY_CONTRACT == 'published_primary_score_v1'
+          Path('/tmp/ha-doctor-v120-ui.js').write_text(app_v080.UI_PATCH_JS+'\n'+app_v082.UI_PATCH_V082+'\n'+app_v083.UI_PATCH_V083+'\n'+app_v084.UI_PATCH_V084+'\n'+app_v085.UI_PATCH_V085+'\n'+app_v086.UI_PATCH_V086+'\n'+app_v087.UI_PATCH_V087+'\n'+app_v088.UI_PATCH_V088+'\n'+app_v090.UI_PATCH_V090+'\n'+app_v100.UI_PATCH_V100+'\n'+app_v110.UI_PATCH_V110+'\n'+app_v120.UI_PATCH_V120,encoding='utf-8')
           PY
-          node --check /tmp/ha-doctor-v110-ui.js
-
-      - name: Validate 0.11 version contracts
-        run: |
-          grep -q 'version: "0.11.0"' ha_doctor/config.yaml
-          grep -q 'VERSION = "0.11.0"' ha_doctor/contracts_v110.py
-          grep -q 'app_v110.py' ha_doctor/run.sh
-          grep -q 'Starting HA Doctor 0.11.0' ha_doctor/run.sh
-          PYTHONPATH=ha_doctor python - <<'PY'
-          import contracts_v110, app_v110
-          assert contracts_v110.VERSION == app_v110.VERSION == '0.11.0'
-          assert contracts_v110.REPORT_SCHEMA == 'ha-doctor-report/0.11'
-          assert contracts_v110.SHARE_SCHEMA == 'ha-doctor-share/5'
-          PY
+          node --check /tmp/ha-doctor-v120-ui.js
+          grep -q 'version: "0.12.0"' ha_doctor/config.yaml
+          grep -q 'app_v120.py' ha_doctor/run.sh
+          grep -q 'Starting HA Doctor 0.12.0' ha_doctor/run.sh
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.11.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.12.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify Cross-Validated modules in image
+      - name: Verify Temporal Truth modules
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c \
-            'test -f /app/app_v110.py && test -f /app/scanner_v110.py && test -f /app/contracts_v110.py &&
-             test -f /app/product_v110.py && test -f /app/selfcheck_v110.py && test -f /app/sharing_v110.py &&
-             test -f /app/finalize_v110.py && test -f /app/semantics_v100.py && test -f /app/resilience_v100.py'
-          docker run --rm --entrypoint python3 ha-doctor-ci -c \
-            "import contracts_v110, app_v110, scanner_v110, product_v110, selfcheck_v110, sharing_v110; assert contracts_v110.VERSION == '0.11.0'; print('0.11 packaged imports OK')"
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v120.py && test -f /app/scanner_v120.py && test -f /app/contracts_v120.py && test -f /app/product_v120.py && test -f /app/selfcheck_v120.py && test -f /app/sharing_v120.py && test -f /app/finalize_v120.py && test -f /app/temporal_v120.py'
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v120,app_v120,scanner_v120,product_v120,selfcheck_v120,sharing_v120,temporal_v120; assert contracts_v120.VERSION=='0.12.0'; print('0.12 packaged imports OK')"
 
-      - name: Smoke test real-report regressions
+      - name: Smoke test temporal truth regressions
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from product_v110 import finding_evidence_count, _security, _maintenance, _single_snapshot_evidence
-          r={'findings':[
-            {'rule_id':'HD-SEC-001','examples':[{}, {}, {}]},
-            {'rule_id':'HD-SEC-003','examples':[{}]*8},
-            {'rule_id':'HD-CFG-001','examples':[{}]*7},
-            {'rule_id':'HD-REG-002','summary':'29 entité(s) locales','examples':[{}]*12},
-          ],'registry_analysis':{'orphan_analysis':{}},'scan_performance':{'single_state_snapshot_preserved':True}}
-          assert finding_evidence_count(r['findings'][0]) == 3
-          assert finding_evidence_count(r['findings'][3]) == 29
-          assert _security(r)['active_secret_hint_count'] == 3
-          assert _security(r)['archive_secret_hint_count'] == 8
-          assert _maintenance(r)['missing_reference_count'] == 7
-          assert _maintenance(r)['local_unavailable_review'] == 29
-          assert _single_snapshot_evidence(r) is True
-          print('0.11 real-report regressions OK')
+          import os,tempfile
+          from temporal_v060 import save_history,load_history
+          from temporal_v120 import apply_temporal_truth_v4,sync_canonical_history,validate_current_canonical_snapshot
+          from contracts_v120 import HISTORY_CONTRACT,ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE
+          f=tempfile.NamedTemporaryFile(delete=False); path=f.name; f.close(); os.unlink(path)
+          save_history([{'generated_at':'2026-08-11T05:14:52Z','health_score_v3':75,'report_version':'0.10.0','active_ids':[]}],path)
+          r={'generated_at':'2026-08-11T05:39:53Z','scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'temporal_analysis':{},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'self_check':{'status':'pass'}}
+          t=apply_temporal_truth_v4(r,history_path=path)
+          assert t['previous_score'] is None and t['score_delta'] is None and t['false_stability_prevented'] is True,t
+          h=load_history(path); h.append({'generated_at':r['generated_at'],'health_score_v3':74,'active_ids':[]}); save_history(h,path)
+          sync_canonical_history(r,history_path=path,publication_complete=True)
+          v=validate_current_canonical_snapshot(r,history_path=path)
+          assert v['valid'] and load_history(path)[-1]['score_contract']==HISTORY_CONTRACT,v
+          os.unlink(path)
           PY
 
-      - name: Runtime smoke test 0.11 API
+      - name: Smoke test public contract freshness
+        run: |
+          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
+          from product_v120 import _refresh_quality_detail,_score_trace,_score_explainer
+          r={'scores':{'global':75},'score_v5_preview':{'v5_preview_score':76},'generated_at':'2026-08-11T05:39:53Z','temporal_analysis':{'previous_score':None,'score_delta':None,'previous_score_trusted':False,'previous_score_source':'legacy_intermediate_health_score_v3','legacy_previous_score_candidate':75,'score_comparison_status':'legacy_untrusted','false_stability_prevented':True},'condition_semantics':{'resolved_pair_count':16,'physical_unproven_pair_count':1,'helper_unproven_pair_count':3},'product_intelligence':{'controller_review_trace':{'numeric_overlap_pair_count':1}},'quality_gates':{'gates':[{'key':'condition_semantics','status':'warning','detail':'16 résolue(s) · 3 par V6'}]}}
+          _refresh_quality_detail(r)
+          assert 'V6' not in r['quality_gates']['gates'][0]['detail']
+          trace=_score_trace(r); exp=_score_explainer(r,trace)
+          assert trace['score_delta'] is None and 'Comparaison suspendue' in exp['reason']
+          PY
+
+      - name: Runtime smoke test 0.12 API
         run: |
           set -euo pipefail
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v110.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v120.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.11.0"' /tmp/version.json
-          grep -q '"ha-doctor-share/5"' /tmp/version.json
+          grep -q '"0.12.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/6"' /tmp/version.json
+          grep -q '"published_primary_score_v1"' /tmp/version.json

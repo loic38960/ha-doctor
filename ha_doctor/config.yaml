@@ -1,7 +1,7 @@
 name: "HA Doctor"
-version: "0.11.0"
+version: "0.12.0"
 slug: "ha_doctor"
-description: "Contrôle technique local, priorisé, explicatif, cross-validé et partageable de votre installation Home Assistant"
+description: "Contrôle technique local, priorisé, explicatif, temporellement fiable et partageable de votre installation Home Assistant"
 arch:
   - amd64
   - aarch64
