@@ -22,124 +22,138 @@ jobs:
       - name: Compile every Python source
         run: python -m py_compile ha_doctor/*.py
 
-      - name: Validate 0.16.1 UI and contracts
+      - name: Validate 0.17 UI and public contracts
         run: |
           PYTHONPATH=ha_doctor python - <<'PY'
           from pathlib import Path
-          import app_v160, contracts_v160
+          import app_v170, contracts_v170
           source=Path('ha_doctor/static/index.html').read_text(encoding='utf-8')
-          enhanced=app_v160.enhance_ui_v160(source)
-          assert 'HA Doctor 0.16 · Evidence Precision Engine' in enhanced
-          assert app_v160.VERSION == contracts_v160.VERSION == '0.16.1'
-          assert contracts_v160.REPORT_SCHEMA == 'ha-doctor-report/0.16'
-          assert contracts_v160.SHARE_SCHEMA == 'ha-doctor-share/10'
-          assert contracts_v160.SHARE_TARGET_BYTES == 20000
-          assert contracts_v160.SHARE_HARD_BYTES == 24000
-          assert contracts_v160.REPAIR_PLAYBOOK_MODEL == 'repair_playbook_v4_precision_evidence'
+          enhanced=app_v170.enhance_ui_v170(source)
+          assert 'HA Doctor 0.17 · Resolution & Attribution Engine' in enhanced
+          assert app_v170.VERSION == contracts_v170.VERSION == '0.17.0'
+          assert contracts_v170.REPORT_SCHEMA == 'ha-doctor-report/0.17'
+          assert contracts_v170.SHARE_SCHEMA == 'ha-doctor-share/11'
+          assert contracts_v170.SHARE_TARGET_BYTES == 18000
+          assert contracts_v170.SHARE_HARD_BYTES == 22000
+          assert contracts_v170.DECISION_MODEL == 'decision_engine_v5_resolution_board'
+          assert contracts_v170.FEEDBACK_MODEL == 'automation_feedback_v2_transition_proof'
+          assert contracts_v170.REFERENCE_MODEL == 'missing_reference_intelligence_v1'
+          assert contracts_v170.SCORE_ATTRIBUTION_MODEL == 'score_attribution_v1_domain_delta'
           PY
-          grep -q 'version: "0.16.1"' ha_doctor/config.yaml
-          grep -q 'Starting HA Doctor 0.16.1' ha_doctor/run.sh
-          grep -q 'app_v160.py' ha_doctor/run.sh
+          grep -q 'version: "0.17.0"' ha_doctor/config.yaml
+          grep -q 'Starting HA Doctor 0.17.0' ha_doctor/run.sh
+          grep -q 'app_v170.py' ha_doctor/run.sh
 
-      - name: Enforce hotfix pipeline architecture
+      - name: Enforce 0.17 resolution pipeline architecture
         run: |
           python - <<'PY'
           from pathlib import Path
-          scanner=Path('ha_doctor/scanner_v160.py').read_text()
-          hotfix=Path('ha_doctor/hotfix_v161.py').read_text()
-          sharing=Path('ha_doctor/sharing_v161.py').read_text()
-          assert 'apply_hotfix_v161(report)' in scanner
-          assert scanner.index('apply_product_intelligence_v8(report)') < scanner.index('apply_hotfix_v161(report)') < scanner.index('stage_publication(report)')
-          assert 'selfcheck_module.build_share_report = build_share_report_v161' in scanner
-          assert 'sharing_module.build_share_report = build_share_report_v161' in scanner
-          assert 'REPAIR_PLAYBOOK_MODEL' in hotfix
-          assert 'weak_pre_control_risk_count' in hotfix
-          assert 'preserved_by_action_plan_order' in sharing
-          assert 'v161_duplicate_truth_compaction' in sharing
-          print('0.16.1 publication hotfix architecture OK')
+          scanner=Path('ha_doctor/scanner_v170.py').read_text()
+          decision=Path('ha_doctor/decision_v170.py').read_text()
+          temporal=Path('ha_doctor/temporal_v170.py').read_text()
+          refs=Path('ha_doctor/reference_intelligence_v170.py').read_text()
+          sharing=Path('ha_doctor/sharing_v170.py').read_text()
+          assert 'additional_home_assistant_state_reads":0' in scanner
+          assert scanner.index('apply_temporal_truth_v8(report)') < scanner.index('apply_product_intelligence_v9(report)') < scanner.index('stage_publication(report)')
+          assert 'run_self_check_v9(report)' in scanner and 'post_commit_validation_v9(report)' in scanner
+          assert 'manual_fix_ready' in decision and 'statically_resolved' in decision
+          assert 'domain_scores' in temporal and 'inventory_signal' in temporal
+          assert 'replacement_inference_enabled": False' in refs or 'replacement_inference_enabled' in refs
+          assert 'all_action_identities_preserved' in sharing and 'all_finding_identities_preserved' in sharing
+          print('0.17 resolution architecture OK')
           PY
 
       - name: Build Home Assistant App image
-        run: docker build --build-arg BUILD_VERSION=0.16.1 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
+        run: docker build --build-arg BUILD_VERSION=0.17.0 --build-arg BUILD_ARCH=amd64 -t ha-doctor-ci ha_doctor
 
-      - name: Verify packaged hotfix modules
+      - name: Verify Resolution & Attribution modules are packaged
         run: |
-          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v160.py && test -f /app/scanner_v160.py && test -f /app/hotfix_v161.py && test -f /app/sharing_v161.py && test -f /app/selfcheck_v160.py && test -f /app/temporal_v160.py'
-          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v160,app_v160,scanner_v160,hotfix_v161,sharing_v161; assert contracts_v160.VERSION=='0.16.1'; print('0.16.1 packaged imports OK')"
+          docker run --rm --entrypoint sh ha-doctor-ci -c 'test -f /app/app_v170.py && test -f /app/scanner_v170.py && test -f /app/contracts_v170.py && test -f /app/automation_resolution_v170.py && test -f /app/reference_intelligence_v170.py && test -f /app/resilience_v170.py && test -f /app/decision_v170.py && test -f /app/product_v170.py && test -f /app/selfcheck_v170.py && test -f /app/sharing_v170.py && test -f /app/temporal_v170.py && test -f /app/finalize_v170.py'
+          docker run --rm --entrypoint python3 ha-doctor-ci -c "import contracts_v170,app_v170,scanner_v170,automation_resolution_v170,reference_intelligence_v170,resilience_v170,decision_v170,product_v170,selfcheck_v170,sharing_v170,temporal_v170; assert contracts_v170.VERSION=='0.17.0'; print('0.17 packaged imports OK')"
 
-      - name: Smoke test precision invariants and Share target
+      - name: Smoke test resolution evidence
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
-          from semantics_v160 import build_controller_impact_v2
-          from hotfix_v161 import apply_hotfix_v161
-          from sharing_v161 import build_share_report
-          from contracts_v160 import *
+          from automation_resolution_v170 import _classify_feedback, build_duplicate_v2
+          from resilience_v170 import _normalize_pre_control
+          from decision_v170 import _duplicate_resolution
+          from reference_intelligence_v170 import build_missing_reference_intelligence
+          from contracts_v170 import REPAIR_PLAYBOOK_MODEL
 
-          sem={'unproven_pairs':[{'entity_id':'switch.boost','automations':['Solar','Low'],'target_kind':'actuator'},{'entity_id':'input_boolean.guard','automations':['Solar','Release'],'target_kind':'helper'}]}
-          scope=build_controller_impact_v2(sem)
-          assert scope['physical_pair_count']==1 and scope['impacted_automation_count']==2
+          p=[{'platform':'state','to':'on','specific_state_edge':True}]
+          c,r,review,reason=_classify_feedback(p,{'state:on'},{'state:off'})
+          assert c=='terminating_state_transition' and not review and reason=='specific_edge_requires_future_reentry'
+          p=[{'platform':'state','to':None,'specific_state_edge':False}]
+          c,r,review,_=_classify_feedback(p,set(),{'state:off'})
+          assert c=='self_retrigger_candidate' and review
 
-          report={
-            'decision_engine':{'items':[{'id':f'A{i}','repair_playbook':{'model':'legacy','repair_readiness':'needs_logic_review','steps':[{'step':1,'detail':'x'}]}} for i in range(16)]},
-            'action_plan':{'model':ACTION_PLAN_MODEL,'total':16,'items':[{'id':f'A{i}','title':f'Action {i}','priority':'verify','severity':'low','domain':'test','confidence':'high','source_type':'finding','source_id':f'F{i%15}','operational_lane':'logic_review','operational_relevance':'medium','execution_priority_score':50,'dependency_impact':{'level':'low','impacted_automation_count':0}} for i in range(16)]},
-            'resilience_recommendations':{'model':RESILIENCE_RECOMMENDATION_MODEL,'analysis_model':RESILIENCE_MODEL,'items':[
-              {'entity_id':'sensor.pool','tier':'must_fix','phase_evidence':[{'phase':'pre_control_decision','protection':'none'}]},
-              {'entity_id':'sensor.eco','tier':'hardening','phase_evidence':[{'phase':'pre_control_decision','protection':'weak'}]},
-            ]},
-            'generated_at':'2026-08-11T09:00:00Z','scores':{'global':77},
-            'findings':[{'rule_id':f'F{i}','title':f'Finding {i}','severity':'low','domain':'test','priority':'verify'} for i in range(15)],
-            'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},
-            'condition_semantics':{'model':CONDITION_MODEL,'unproven_pairs':[]},
-            'controller_impact':{'model':CONTROLLER_IMPACT_MODEL},
-            'duplicate_action_semantics':{'model':DUPLICATE_MODEL,'count':0,'items':[]},
-            'automation_feedback_semantics':{'model':LOOP_MODEL,'count':0,'items':[]},
-            'temporal_analysis':{'model':TEMPORAL_MODEL,'history_contract':HISTORY_CONTRACT,'history_policy':HISTORY_POLICY,'publication_model':PUBLICATION_MODEL},
-            'product_intelligence':{'model':'x','public_contract_truth':{'model':'x','version_fresh':True,'decision_item_identity':True,'canonical_order_identity':True,'precision_models_present':True}},
-            'doctor_view':{'model':PRODUCT_MODEL,'trust':{'model':TRUST_MODEL,'score':90,'level':'high','read_only':True}},
-            'quality_gates':{},'self_check':{'model':SELF_CHECK_MODEL,'status':'pass','failures':[],'warnings':[]},
-            'report_schema':{'version':REPORT_SCHEMA,'capabilities':[]},
-          }
-          report['decision_engine'].update({'model':DECISION_MODEL,'total':16,'primary_action_count':16,'lane_counts':{'logic_review':16},'canonical_order':{'model':CANONICAL_ORDER_MODEL,'item_ids':[f'A{i}' for i in range(16)]},'top':[]})
-          apply_hotfix_v161(report)
-          assert all(x['repair_playbook']['model']==REPAIR_PLAYBOOK_MODEL for x in report['decision_engine']['items'])
-          assert report['resilience_recommendations']['items'][0]['pre_control_risk_count']==1
-          assert report['resilience_recommendations']['items'][1]['pre_control_risk_count']==0
-          assert report['resilience_recommendations']['items'][1]['weak_pre_control_risk_count']==1
-          share=build_share_report(report); meta=share['export_meta']
-          assert meta['within_target_bytes'], meta['share_report_bytes_estimate']
-          assert meta['within_hard_bytes'] and meta['all_action_identities_preserved'] and meta['all_finding_identities_preserved']
-          print('Hotfix precision + Share target OK', meta['share_report_bytes_estimate'])
+          report={'duplicate_action_semantics':{'model':'duplicate_action_semantics_v1','count':1,'side_effect_duplicate_count':1,'items':[{'classification':'side_effect_duplicate','exact_duplicate':True,'automatic_removal_safe':False}]}}
+          build_duplicate_v2(report)
+          item={'source_id':'HD-AUTO-005','operational_lane':'logic_review','operational_relevance':'medium','repair_playbook':{}}
+          assert _duplicate_resolution(item,report) and item['operational_lane']=='fix_now'
+          assert item['repair_playbook']['model']==REPAIR_PLAYBOOK_MODEL and item['repair_playbook']['automatic_fix'] is False
+
+          weak=_normalize_pre_control({'tier':'hardening','phase_evidence':[{'phase':'pre_control_decision','protection':'weak'}]})
+          raw=_normalize_pre_control({'tier':'hardening','phase_evidence':[{'phase':'pre_control_decision','protection':'none'}]})
+          assert weak['tier']=='hardening' and weak['weak_pre_control_risk_count']==1 and weak['pre_control_risk_count']==0
+          assert raw['tier']=='must_fix' and raw['unprotected_pre_control_risk_count']==1
+
+          refs=build_missing_reference_intelligence({'findings':[{'rule_id':'HD-CFG-001','examples':[{'entity_id':'light.missing','file':'packages/x.yaml'}]}],'action_plan':{'items':[{'source_id':'HD-CFG-001','dependency_impact':{'impacted_automation_count':0}}]}})
+          assert refs['replacement_inference_enabled'] is False
+          assert all(x['replacement_suggestion'] is None and x['replacement_inferred'] is False for x in refs['items'])
+          print('0.17 resolution evidence OK')
           PY
 
-      - name: Smoke test publication identity
+      - name: Smoke test 0.17 domain attribution and canonical publication
         run: |
           docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
           import os,tempfile
           from temporal_v060 import save_history,load_history
-          from temporal_v160 import stage_publication,commit_publication,validate_current_snapshot,refresh_published_baseline_visibility
-          from contracts_v160 import VERSION,REPORT_SCHEMA,ACTION_PLAN_MODEL,ACTION_PLAN_SOURCE,DECISION_MODEL,CONDITION_MODEL,HISTORY_CONTRACT
+          from temporal_v170 import _attribution,stage_publication,commit_publication,validate_current_snapshot
+          from contracts_v170 import *
+
+          old={'final_primary_score':76,'publication_complete':True,'score_contract':HISTORY_CONTRACT}
+          a=_attribution({'scores':{'global':77,'domains':{'entities':81}}},old)
+          assert a['status']=='baseline_domain_detail_unavailable' and a['domain_detail_available'] is False and a['primary_delta']==1
+          old['domain_scores']={'entities':81}; old['inventory_signal']={'unavailable_count':190,'unknown_count':151,'states':1866}
+          a=_attribution({'scores':{'global':78,'domains':{'entities':82}},'inventory_summary':{'unavailable_count':180,'unknown_count':150,'states':1866}},old)
+          assert a['status']=='attributed' and a['largest_positive_domain']['domain']=='entities' and a['inventory_delta']['unavailable_count']==-10
+
           f=tempfile.NamedTemporaryFile(delete=False); path=f.name; f.close(); os.unlink(path)
-          save_history([{'generated_at':'2026-08-11T09:00:00Z','active_ids':[]}],path)
-          r={'generated_at':'2026-08-11T09:00:00Z','scores':{'global':77},'score_v5_preview':{'v5_preview_score':78},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'self_check':{'status':'pass'}}
-          stage_publication(r,path); assert validate_current_snapshot(r,path,require_published=False)['valid']
-          commit_publication(r,path); assert validate_current_snapshot(r,path,require_published=True)['valid']
-          vis=refresh_published_baseline_visibility(r,path); snap=load_history(path)[-1]
-          assert vis['current_committed_baseline'] and snap['report_version']==VERSION=='0.16.1'
-          assert snap['report_schema']==REPORT_SCHEMA and snap['score_contract']==HISTORY_CONTRACT and snap['final_primary_score']==77
+          save_history([{'generated_at':'2026-08-11T10:30:00Z','active_ids':[]}],path)
+          r={'generated_at':'2026-08-11T10:30:00Z','scores':{'global':77,'domains':{'entities':81,'automations':75}},'inventory_summary':{'unavailable_count':190,'unknown_count':151,'states':1866},'action_plan':{'model':ACTION_PLAN_MODEL},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'decision_engine':{'model':DECISION_MODEL},'condition_semantics':{'model':CONDITION_MODEL},'temporal_analysis':{'model':TEMPORAL_MODEL},'self_check':{'status':'pass'}}
+          stage_publication(r,path); assert validate_current_snapshot(r,path,False)['valid']
+          commit_publication(r,path); v=validate_current_snapshot(r,path,True); assert v['valid'] and v['domain_scores_persisted']
+          snap=load_history(path)[-1]; assert snap['report_version']=='0.17.0' and snap['domain_scores']['entities']==81
           os.unlink(path)
-          print('0.16.1 publication identity OK')
+          print('0.17 attribution + publication OK')
           PY
 
-      - name: Runtime smoke test 0.16.1 API
+      - name: Smoke test Share V11 budget and identities
+        run: |
+          docker run --rm -i --entrypoint python3 ha-doctor-ci - <<'PY'
+          from sharing_v170 import build_share_report
+          from contracts_v170 import *
+          actions=[{'id':f'A{i}','title':f'Action {i}','priority':'verify','severity':'low','domain':'test','confidence':'high','source_type':'finding','source_id':f'F{i%15}','operational_lane':'logic_review','operational_relevance':'medium','resolution_status':'logic_review_required','dependency_impact':{'level':'low','impacted_automation_count':0}} for i in range(16)]
+          r={'generated_at':'2026-08-11T10:30:00Z','scores':{'global':77,'domains':{'entities':81}},'findings':[{'rule_id':f'F{i}','title':f'F{i}','severity':'low','domain':'test','priority':'verify'} for i in range(15)],'action_plan':{'model':ACTION_PLAN_MODEL,'total':16,'items':actions},'diagnostic_summary':{'source':ACTION_PLAN_SOURCE},'condition_semantics':{'model':CONDITION_MODEL,'unproven_pairs':[]},'resilience_recommendations':{'model':RESILIENCE_RECOMMENDATION_MODEL,'analysis_model':RESILIENCE_MODEL,'items':[]},'automation_feedback_semantics':{'model':FEEDBACK_MODEL,'count':0},'duplicate_action_semantics':{'model':DUPLICATE_MODEL,'count':0},'missing_reference_intelligence':{'model':REFERENCE_MODEL,'finding_present':False,'replacement_inference_enabled':False,'items':[]},'automation_resolution':{'model':'automation_resolution_v2'},'decision_engine':{'model':DECISION_MODEL,'total':16,'primary_action_count':16,'lane_counts':{'logic_review':16},'resolution_counts':{'logic_review_required':16},'canonical_order':{'model':CANONICAL_ORDER_MODEL,'item_ids':[f'A{i}' for i in range(16)]}},'temporal_analysis':{'model':TEMPORAL_MODEL,'history_contract':HISTORY_CONTRACT},'score_attribution':{'model':SCORE_ATTRIBUTION_MODEL,'status':'baseline_domain_detail_unavailable','domain_detail_available':False},'doctor_view':{'model':PRODUCT_MODEL,'trust':{}},'product_intelligence':{'model':'x','public_contract_truth':{}},'quality_gates':{},'self_check':{'status':'pass'},'report_schema':{'version':REPORT_SCHEMA,'capabilities':[]}}
+          s=build_share_report(r); m=s['export_meta']
+          assert s['share_schema']['version']==SHARE_SCHEMA and m['exported_action_count']==16 and m['exported_finding_count']==15
+          assert m['within_target_bytes'], m['share_report_bytes_estimate']
+          assert m['within_hard_bytes'] and m['replacement_inference_disabled']
+          print('Share V11 OK',m['share_report_bytes_estimate'])
+          PY
+
+      - name: Runtime smoke test 0.17 API
         run: |
           set -euo pipefail
           cleanup(){ docker logs ha-doctor-ci-runtime || true; docker rm -f ha-doctor-ci-runtime >/dev/null 2>&1 || true; }
           trap cleanup EXIT
-          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v160.py
+          docker run -d --name ha-doctor-ci-runtime -e HA_DOCTOR_SCAN_ON_START=false -p 127.0.0.1:18099:8099 --entrypoint python3 ha-doctor-ci /app/app_v170.py
           ok=0; for i in $(seq 1 20); do if curl -fsS http://127.0.0.1:18099/health >/tmp/health.json; then ok=1; break; fi; sleep 1; done; test "$ok" -eq 1
           curl -fsS http://127.0.0.1:18099/api/version -o /tmp/version.json
-          grep -q '"0.16.1"' /tmp/version.json
-          grep -q '"ha-doctor-share/10"' /tmp/version.json
-          grep -q '"decision_engine_v4_precision_board"' /tmp/version.json
-          grep -q '"condition_semantics_v11_evidence_precision"' /tmp/version.json
-          grep -q '"controller_impact_v2_unresolved_scope"' /tmp/version.json
+          grep -q '"0.17.0"' /tmp/version.json
+          grep -q '"ha-doctor-share/11"' /tmp/version.json
+          grep -q '"decision_engine_v5_resolution_board"' /tmp/version.json
+          grep -q '"automation_feedback_v2_transition_proof"' /tmp/version.json
+          grep -q '"score_attribution_v1_domain_delta"' /tmp/version.json
+          curl -fsS http://127.0.0.1:18099/api/resolution -o /tmp/resolution.json || test "$?" -eq 22
